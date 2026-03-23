@@ -1,0 +1,23 @@
+[package]
+name = "dynamodb-facade"
+version = "0.0.0"
+rust-version = "1.85.0"
+edition = "2024"
+authors = ["Jérémie RODON <jeremie.rodon@gmail.com>"]
+license = "MIT"
+description = "A typed facade over aws-sdk-dynamodb with expression builders and batch/transaction support"
+repository = "https://github.com/RustyServerless/dynamodb-facade"
+documentation = "https://docs.rs/dynamodb-facade"
+readme = "README.md"
+keywords = ["dynamodb", "aws", "facade", "dynamo", "sdk"]
+categories = ["database", "api-bindings"]
+
+
+[dependencies]
+tokio = "1"
+aws-sdk-dynamodb = "1"
+
+serde = "1"
+serde_dynamo = { version = "4", features = ["aws-sdk-dynamodb+1"] }
+
+tracing = "0.1"
