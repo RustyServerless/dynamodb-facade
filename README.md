@@ -55,8 +55,8 @@ User::update_by_id(
     KeyId::pk(user_id),
     Update::set("name", new_name),
 )
-    .exists()
-    .await?;
+.exists()
+.await?;
 // Returns the updated `User`. Placeholders, key map,
 // return-value plumbing, and deserialisation are all handled.
 ```
@@ -260,8 +260,8 @@ let u = Update::combine(
 // All enrollments for a user — key condition derived from the item type:
 let enrollments /* : Vec<Enrollment> */ =
     Enrollment::query(client.clone(), Enrollment::key_condition(user_id))
-        .all()
-        .await?;
+    .all()
+    .await?;
 
 // Query a GSI:
 let users_by_email /* : Vec<User> */ =
@@ -303,8 +303,8 @@ client
             Update::init_increment("enrollment_count", 0, 1),
         )
         .condition(
-            User::exists()
-                & Condition::lt("enrollment_count", max_enrollments),
+            User::exists() &
+            Condition::lt("enrollment_count", max_enrollments),
         )
         .build(),
     )
