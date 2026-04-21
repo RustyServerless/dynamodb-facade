@@ -350,8 +350,9 @@ When serde round-trip is insufficient (e.g. enum stored as a single attribute):
 use dynamodb_facade::{
     attr_list, has_attributes, DynamoDBItem, Error, IntoAttributeValue, Item,
 };
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum CourseStatus {
     Draft,
     Published,
