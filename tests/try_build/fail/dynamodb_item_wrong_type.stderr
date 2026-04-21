@@ -1,0 +1,22 @@
+error[E0277]: the trait bound `std::string::String: IntoTypedAttributeValue<NumberAttribute>` is not satisfied
+  --> tests/try_build/fail/dynamodb_item_wrong_type.rs:26:39
+   |
+26 |             fn attribute_value(id) -> String { id.to_owned() }
+   |                                       ^^^^^^ the trait `dynamodb_facade::values::typed::IntoNumberAttributeValue` is not implemented for `std::string::String`
+   |
+   = help: the following other types implement trait `dynamodb_facade::values::typed::IntoNumberAttributeValue`:
+             AsNumber<T>
+             f32
+             f64
+             i128
+             i16
+             i32
+             i64
+             i8
+           and $N others
+   = note: required for `std::string::String` to implement `IntoTypedAttributeValue<NumberAttribute>`
+note: required by a bound in `dynamodb_facade::HasAttribute::Value`
+  --> src/schema/attributes.rs
+   |
+   |     type Value: IntoTypedAttributeValue<A::Type>;
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `HasAttribute::Value`

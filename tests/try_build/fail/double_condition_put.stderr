@@ -1,0 +1,14 @@
+error[E0599]: no method named `condition` found for struct `PutItemRequest<PlatformTable, User, Typed, ReturnNothing, AlreadyHasCondition>` in the current scope
+  --> tests/try_build/fail/double_condition_put.rs:18:10
+   |
+15 |       let _ = sample_user()
+   |  _____________-
+16 | |         .put(client)
+17 | |         .condition(Condition::eq("role", "student"))
+18 | |         .condition(Condition::eq("role", "instructor")); // <-- compile error here
+   | |         -^^^^^^^^^ method not found in `PutItemRequest<PlatformTable, User, Typed, ReturnNothing, AlreadyHasCondition>`
+   | |_________|
+   |
+   |
+   = note: the method was found for
+           - `PutItemRequest<TD, T, O, R>`

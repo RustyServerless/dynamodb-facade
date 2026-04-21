@@ -1,0 +1,21 @@
+warning: unused import: `KeyId`
+  --> tests/try_build/fail/double_projection_query.rs:12:39
+   |
+12 | use dynamodb_facade::{DynamoDBItemOp, KeyId, Projection};
+   |                                       ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0599]: no method named `project` found for struct `QueryRequest<dynamodb_facade::test_fixtures::PlatformTable, dynamodb_facade::test_fixtures::User, Raw, NoFilter, AlreadyHasProjection>` in the current scope
+  --> tests/try_build/fail/double_projection_query.rs:17:10
+   |
+15 |       let _ = User::query(client, User::key_condition("user-1"))
+   |  _____________-
+16 | |         .project(Projection::<PlatformTable>::new(["name"]))
+17 | |         .project(Projection::<PlatformTable>::new(["email"])); // <-- compile error here
+   | |         -^^^^^^^ method not found in `QueryRequest<dynamodb_facade::test_fixtures::PlatformTable, dynamodb_facade::test_fixtures::User, Raw, NoFilter, AlreadyHasProjection>`
+   | |_________|
+   |
+   |
+   = note: the method was found for
+           - `QueryRequest<TD, T, O, F>`

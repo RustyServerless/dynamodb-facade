@@ -1,0 +1,28 @@
+warning: unused import: `Projection`
+  --> tests/try_build/fail/get_sk_on_simple_key.rs:12:46
+   |
+12 | use dynamodb_facade::{DynamoDBItemOp, KeyId, Projection};
+   |                                              ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0308]: mismatched types
+  --> tests/try_build/fail/get_sk_on_simple_key.rs:15:51
+   |
+15 |     let _ = User::get(client, KeyId::pk("u-1").sk("oops")); // <-- compile error here
+   |                                                -- ^^^^^^ expected `NoId`, found `&str`
+   |                                                |
+   |                                                arguments to this method are incorrect
+   |
+help: the return type of this call is `&'static str` due to the type of the argument passed
+  --> tests/try_build/fail/get_sk_on_simple_key.rs:15:31
+   |
+15 |     let _ = User::get(client, KeyId::pk("u-1").sk("oops")); // <-- compile error here
+   |                               ^^^^^^^^^^^^^^^^^^^^------^
+   |                                                   |
+   |                                                   this argument influences the return type of `sk`
+note: method defined here
+  --> src/item/key_id.rs
+   |
+   |     pub fn sk<SkId>(self, sk: SkId) -> KeyId<PkId, SkId> {
+   |            ^^

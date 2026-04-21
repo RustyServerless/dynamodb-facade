@@ -36,9 +36,14 @@ if (
     RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps --document-private-items
     ((total_errors += $?))
 
-    # Run tests that could be affected by the changes
-    echo "Running tests..."
-    cargo test --all-features
+    # Run tests — include integration tests when Docker is available
+    if docker info &>/dev/null; then
+        echo "Running tests (with integration)..."
+        cargo test --all-features
+    else
+        echo "Running tests (Docker unavailable, skipping integration)..."
+        cargo test --features test-fixtures
+    fi
     ((total_errors += $?))
 
     [ $total_errors -eq 0 ]

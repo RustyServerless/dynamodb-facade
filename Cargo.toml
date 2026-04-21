@@ -1,6 +1,6 @@
 [package]
 name = "dynamodb-facade"
-version = "0.0.0"
+version = "0.1.0"
 rust-version = "1.85.0"
 edition = "2024"
 authors = ["Jérémie RODON <jeremie.rodon@gmail.com>"]
@@ -13,11 +13,27 @@ keywords = ["dynamodb", "aws", "facade", "dynamo", "sdk"]
 categories = ["database", "api-bindings"]
 
 
+[features]
+integration = []
+test-fixtures = []
+
 [dependencies]
 tokio = "1"
-aws-sdk-dynamodb = "1"
+async-stream = "0.3"
+futures-core = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 
-serde = "1"
+aws-sdk-dynamodb = "1"
+thiserror = "1"
+
+serde = { version = "1", features = ["derive"] }
 serde_dynamo = { version = "4", features = ["aws-sdk-dynamodb+1"] }
 
 tracing = "0.1"
+
+[dev-dependencies]
+aws-config = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+testcontainers = "0.27"
+testcontainers-modules = { version = "0.15", features = ["dynamodb"] }
+trybuild = "1"

@@ -1,0 +1,13 @@
+error[E0599]: no method named `project` found for struct `GetItemRequest<dynamodb_facade::test_fixtures::PlatformTable, dynamodb_facade::test_fixtures::User, Raw, AlreadyHasProjection>` in the current scope
+  --> tests/try_build/fail/double_projection_get.rs:17:10
+   |
+15 |       let _ = User::get(client, KeyId::pk("u-1"))
+   |  _____________-
+16 | |         .project(Projection::<PlatformTable>::new(["name"]))
+17 | |         .project(Projection::<PlatformTable>::new(["email"])); // <-- compile error here
+   | |         -^^^^^^^ method not found in `GetItemRequest<dynamodb_facade::test_fixtures::PlatformTable, dynamodb_facade::test_fixtures::User, Raw, AlreadyHasProjection>`
+   | |_________|
+   |
+   |
+   = note: the method was found for
+           - `GetItemRequest<TD, T, O>`

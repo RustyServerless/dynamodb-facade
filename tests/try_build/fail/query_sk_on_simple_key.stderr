@@ -1,0 +1,21 @@
+error[E0599]: the method `sk_eq` exists for struct `KeyCondition<'_, __TableKeySchema>`, but its trait bounds were not satisfied
+  --> tests/try_build/fail/query_sk_on_simple_key.rs:25:65
+   |
+17 | / dynamodb_facade::table_definitions! {
+18 | |     SimpleTable {
+19 | |         type PartitionKey = SPk;
+20 | |         fn table_name() -> String { "simple".to_owned() }
+21 | |     }
+22 | | }
+   | |_- doesn't satisfy `__TableKeySchema: CompositeKeySchema`
+...
+25 |       let _ = KeyCondition::<TableSchema<SimpleTable>>::pk("abc").sk_eq("oops"); // <-- compile error here
+   |                                                                   ^^^^^ method cannot be called on `KeyCondition<'_, __TableKeySchema>` due to unsatisfied trait bounds
+   |
+   = note: the following trait bounds were not satisfied:
+           `__TableKeySchema: CompositeKeySchema`
+note: the trait `CompositeKeySchema` must be implemented
+  --> src/schema/mod.rs
+   |
+   | pub trait CompositeKeySchema: KeySchema<Kind = CompositeKey> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

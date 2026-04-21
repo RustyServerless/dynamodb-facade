@@ -1,0 +1,25 @@
+error[E0599]: `ScanRequest<PlatformTable, dynamodb_facade::test_fixtures::User, Typed, AlreadyHasFilter>` is not an iterator
+  --> tests/try_build/fail/double_filter_scan.rs:16:10
+   |
+14 |       let _ = User::scan(client)
+   |  _____________-
+15 | |         .filter(Condition::eq("role", "student"))
+16 | |         .filter(Condition::eq("role", "instructor")); // <-- compile error here
+   | |         -^^^^^^ `ScanRequest<PlatformTable, dynamodb_facade::test_fixtures::User, Typed, AlreadyHasFilter>` is not an iterator
+   | |_________|
+   |
+   |
+  ::: src/operations/scan.rs
+   |
+   | / pub struct ScanRequest<
+   | |     TD: TableDefinition,
+   | |     T = (),
+   | |     O: OutputFormat = Raw,
+   | |     F: FilterState = NoFilter,
+   | |     P: ProjectionState = NoProjection,
+   | | > {
+   | |_- doesn't satisfy `_: Iterator`
+   |
+   = note: the following trait bounds were not satisfied:
+           `ScanRequest<PlatformTable, dynamodb_facade::test_fixtures::User, Typed, AlreadyHasFilter>: Iterator`
+           which is required by `&mut ScanRequest<PlatformTable, dynamodb_facade::test_fixtures::User, Typed, AlreadyHasFilter>: Iterator`

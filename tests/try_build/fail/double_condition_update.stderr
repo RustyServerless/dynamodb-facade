@@ -1,0 +1,14 @@
+error[E0599]: no method named `condition` found for struct `UpdateItemRequest<PlatformTable, User, Typed, ReturnNothing, AlreadyHasCondition>` in the current scope
+  --> tests/try_build/fail/double_condition_update.rs:18:10
+   |
+15 |       let _ = sample_user()
+   |  _____________-
+16 | |         .update(client, Update::set("role", "inspector"))
+17 | |         .condition(Condition::eq("role", "student"))
+18 | |         .condition(Condition::eq("role", "instructor")); // <-- compile error here
+   | |         -^^^^^^^^^ method not found in `UpdateItemRequest<PlatformTable, User, Typed, ReturnNothing, AlreadyHasCondition>`
+   | |_________|
+   |
+   |
+   = note: the method was found for
+           - `UpdateItemRequest<TD, T, O, R>`

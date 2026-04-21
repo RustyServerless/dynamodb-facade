@@ -1,0 +1,25 @@
+error[E0599]: `QueryRequest<PlatformTable, dynamodb_facade::test_fixtures::User, Typed, AlreadyHasFilter>` is not an iterator
+  --> tests/try_build/fail/double_filter_query.rs:16:10
+   |
+14 |       let _ = User::query(client, User::key_condition("user-1"))
+   |  _____________-
+15 | |         .filter(Condition::eq("role", "student"))
+16 | |         .filter(Condition::eq("role", "instructor")); // <-- compile error here
+   | |         -^^^^^^ `QueryRequest<PlatformTable, dynamodb_facade::test_fixtures::User, Typed, AlreadyHasFilter>` is not an iterator
+   | |_________|
+   |
+   |
+  ::: src/operations/query.rs
+   |
+   | / pub struct QueryRequest<
+   | |     TD: TableDefinition,
+   | |     T = (),
+   | |     O: OutputFormat = Raw,
+   | |     F: FilterState = NoFilter,
+   | |     P: ProjectionState = NoProjection,
+   | | > {
+   | |_- doesn't satisfy `_: Iterator`
+   |
+   = note: the following trait bounds were not satisfied:
+           `QueryRequest<PlatformTable, dynamodb_facade::test_fixtures::User, Typed, AlreadyHasFilter>: Iterator`
+           which is required by `&mut QueryRequest<PlatformTable, dynamodb_facade::test_fixtures::User, Typed, AlreadyHasFilter>: Iterator`

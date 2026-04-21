@@ -1,0 +1,14 @@
+error[E0599]: no method named `condition` found for struct `DeleteItemRequest<PlatformTable, User, Typed, ReturnNothing, AlreadyHasCondition>` in the current scope
+  --> tests/try_build/fail/double_condition_delete.rs:18:10
+   |
+15 |       let _ = sample_user()
+   |  _____________-
+16 | |         .delete(client)
+17 | |         .condition(Condition::eq("role", "student"))
+18 | |         .condition(Condition::eq("role", "instructor")); // <-- compile error here
+   | |         -^^^^^^^^^ method not found in `DeleteItemRequest<PlatformTable, User, Typed, ReturnNothing, AlreadyHasCondition>`
+   | |_________|
+   |
+   |
+   = note: the method was found for
+           - `DeleteItemRequest<TD, T, O, R>`

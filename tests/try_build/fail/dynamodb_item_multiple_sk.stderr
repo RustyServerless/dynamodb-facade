@@ -1,0 +1,29 @@
+error: `dynamodb_item!` expected:
+           #[table = TableType]
+           ItemType {
+               #[partition_key]
+               PkAttr { ... }
+               [#[sort_key]]
+               [SkAttr { ... }]
+               AdditionalAttr { ... }
+               ...
+           }
+  --> tests/try_build/fail/dynamodb_item_multiple_sk.rs:13:1
+   |
+13 | / dynamodb_item! {
+14 | |     #[table = PlatformTable]
+15 | |     User {
+16 | |         #[partition_key]
+...  |
+29 | | }
+   | |_^
+   |
+   = note: this error originates in the macro `$crate::dynamodb_item` which comes from the expansion of the macro `dynamodb_item` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused import: `test_fixtures::*`
+ --> tests/try_build/fail/dynamodb_item_multiple_sk.rs:3:38
+  |
+3 | use dynamodb_facade::{dynamodb_item, test_fixtures::*};
+  |                                      ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
