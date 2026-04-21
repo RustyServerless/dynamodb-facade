@@ -43,8 +43,8 @@ client.update_item()
     .send()
     .await?
     .attributes
-    .map(|attrs| serde_dynamo::from_item(attrs).unwrap())
-    .expect("asked for ALL_NEW");
+    .map(|attrs| serde_dynamo::from_item(attrs))
+    .expect("asked for ALL_NEW")?;
 ```
 
 Same operation with `dynamodb-facade`:
