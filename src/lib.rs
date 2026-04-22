@@ -344,13 +344,16 @@
 //! # Error Handling
 //!
 //! All fallible operations return [`Result<T>`] (an alias for
-//! `core::result::Result<T, `[`Error`]`>`). The [`Error`] enum has four
+//! `core::result::Result<T, `[`Error`]`>`). The [`Error`] enum has five
 //! variants:
 //!
 //! - [`Error::DynamoDB`] — wraps a boxed [`DynamoDBError`] from the AWS SDK.
 //!   Use [`Error::as_dynamodb_error`] to downcast and match on specific SDK
 //!   error types such as `ConditionalCheckFailedException`.
 //! - [`Error::Serde`] — a `serde_dynamo` (de)serialization failure.
+//! - [`Error::FailedBatchWrite`] — a batch write that could not complete
+//!   after all retry attempts. Contains the unprocessed
+//!   [`WriteRequest`](aws_sdk_dynamodb::types::WriteRequest)s.
 //! - [`Error::Custom`] — a caller-supplied string message, created via
 //!   [`Error::custom`].
 //! - [`Error::Other`] — any `Box<dyn Error + Send + Sync>`, created via
