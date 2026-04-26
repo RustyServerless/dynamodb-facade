@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `Projection::keys_only()` constructor for building a key-only projection (PK, plus SK on composite-key tables) without supplying any extra attribute names.
+
 ## [0.1.0] - 2026-04-21
 
 First public release on crates.io. `dynamodb-facade` is a typed facade over [`aws-sdk-dynamodb`](https://crates.io/crates/aws-sdk-dynamodb) that replaces string-spliced expressions, hand-built key maps, pagination loops, and 25-item batch chunking with composable, compile-time-checked Rust.

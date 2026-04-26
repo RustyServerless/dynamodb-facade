@@ -102,6 +102,31 @@ where
             _marker: PhantomData,
         }
     }
+
+    /// Creates a projection that contains **only** the table's key attributes.
+    ///
+    /// The result is a projection that includes exactly PK (for simple-key tables)
+    /// or PK + SK (for composite-key tables).
+    ///
+    /// This is useful when you want to list or scan matching items without
+    /// fetching any payload data — for example, collecting the keys of all
+    /// enrollments for a user before issuing a batch delete.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use dynamodb_facade::test_fixtures::*;
+    /// use dynamodb_facade::Projection;
+    ///
+    /// // PlatformTable has composite key PK + SK — those are the only attributes returned.
+    /// let proj = Projection::<PlatformTable>::keys_only();
+    ///
+    /// let rendered = format!("{proj}");
+    /// assert_eq!(rendered, "PK,SK");
+    /// ```
+    pub fn keys_only() -> Self {
+        Self::new([] as [Cow<'a, str>; 0])
+    }
 }
 
 mod key_schema_projection {
