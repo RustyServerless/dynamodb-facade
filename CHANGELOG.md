@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - `Projection::keys_only()` constructor for building a key-only projection (PK, plus SK on composite-key tables) without supplying any extra attribute names.
+- Re-export the entire `aws_sdk_dynamodb` crate so downstream code can reach any SDK item (e.g. `aws_sdk_dynamodb::operation::*`, `aws_sdk_dynamodb::types::*`) without adding a separate dependency and risking a version mismatch.
 
 ### Changed
 

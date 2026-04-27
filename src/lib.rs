@@ -415,6 +415,7 @@ pub use operations::*;
 pub use schema::*;
 pub use values::*;
 
+pub use aws_sdk_dynamodb;
 pub use aws_sdk_dynamodb::{Client, Error as DynamoDBError, types::AttributeValue};
 
 #[cfg(any(test, feature = "test-fixtures", doc))]
