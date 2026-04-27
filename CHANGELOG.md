@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-27
+
 ### Added
 
 - `Projection::keys_only()` constructor for building a key-only projection (PK, plus SK on composite-key tables) without supplying any extra attribute names.
@@ -51,5 +53,6 @@ First public release on crates.io. `dynamodb-facade` is a typed facade over [`aw
 ### Added
 - Crate.io placeholder
 
+[0.1.1]: https://github.com/RustyServerless/dynamodb-facade/releases/tag/v0.1.1
 [0.1.0]: https://github.com/RustyServerless/dynamodb-facade/releases/tag/v0.1.0
 [0.0.0]: https://github.com/RustyServerless/dynamodb-facade/releases/tag/v0.0.0
