@@ -210,10 +210,7 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     fn get(
         client: aws_sdk_dynamodb::Client,
         key_id: Self::KeyId<'_>,
-    ) -> GetItemRequest<TD, Self, Typed>
-    where
-        Self: DeserializeOwned,
-    {
+    ) -> GetItemRequest<TD, Self, Typed> {
         GetItemRequest::_new(client, Self::get_key_from_id(key_id))
     }
 
@@ -372,10 +369,7 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     fn delete_by_id(
         client: aws_sdk_dynamodb::Client,
         key_id: Self::KeyId<'_>,
-    ) -> DeleteItemRequest<TD, Self, Typed, Return<Old>>
-    where
-        Self: DeserializeOwned,
-    {
+    ) -> DeleteItemRequest<TD, Self, Typed, Return<Old>> {
         DeleteItemRequest::_new(client, Self::get_key_from_id(key_id)).return_old()
     }
 
@@ -499,10 +493,7 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
         client: aws_sdk_dynamodb::Client,
         key_id: Self::KeyId<'_>,
         update: Update<'_>,
-    ) -> UpdateItemRequest<TD, Self, Typed, Return<New>>
-    where
-        Self: DeserializeOwned,
-    {
+    ) -> UpdateItemRequest<TD, Self, Typed, Return<New>> {
         UpdateItemRequest::_new(client, Self::get_key_from_id(key_id), update)
     }
 
@@ -544,10 +535,7 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     /// # Ok(())
     /// # }
     /// ```
-    fn scan(client: aws_sdk_dynamodb::Client) -> ScanRequest<TD, Self, Typed>
-    where
-        Self: DeserializeOwned,
-    {
+    fn scan(client: aws_sdk_dynamodb::Client) -> ScanRequest<TD, Self, Typed> {
         ScanRequest::_new(client)
     }
 
@@ -590,7 +578,7 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
         client: aws_sdk_dynamodb::Client,
     ) -> ScanRequest<TD, Self, Typed>
     where
-        Self: DeserializeOwned + HasIndexKeyAttributes<TD, I>,
+        Self: HasIndexKeyAttributes<TD, I>,
     {
         ScanRequest::_new_index::<I>(client)
     }
@@ -634,10 +622,7 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     fn query(
         client: aws_sdk_dynamodb::Client,
         key_condition: KeyCondition<'_, TD::KeySchema, impl KeyConditionState>,
-    ) -> QueryRequest<TD, Self, Typed>
-    where
-        Self: DeserializeOwned,
-    {
+    ) -> QueryRequest<TD, Self, Typed> {
         QueryRequest::_new(client, key_condition)
     }
 
@@ -664,7 +649,7 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     /// ```
     fn query_all(client: aws_sdk_dynamodb::Client) -> QueryRequest<TD, Self, Typed>
     where
-        Self: DeserializeOwned + HasConstAttribute<<TD::KeySchema as KeySchema>::PartitionKey>,
+        Self: HasConstAttribute<<TD::KeySchema as KeySchema>::PartitionKey>,
     {
         Self::query(client, KeyCondition::pk(Self::VALUE))
     }
@@ -699,7 +684,7 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
         key_condition: KeyCondition<'_, I::KeySchema, impl KeyConditionState>,
     ) -> QueryRequest<TD, Self, Typed>
     where
-        Self: DeserializeOwned + HasIndexKeyAttributes<TD, I>,
+        Self: HasIndexKeyAttributes<TD, I>,
     {
         QueryRequest::_new_index::<I>(client, key_condition)
     }
@@ -730,8 +715,7 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
         client: aws_sdk_dynamodb::Client,
     ) -> QueryRequest<TD, Self, Typed>
     where
-        Self: DeserializeOwned
-            + HasIndexKeyAttributes<TD, I>
+        Self: HasIndexKeyAttributes<TD, I>
             + HasConstAttribute<<I::KeySchema as KeySchema>::PartitionKey>,
     {
         Self::query_index::<I>(client, KeyCondition::pk(Self::VALUE))

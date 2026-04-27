@@ -147,7 +147,7 @@ impl<TD: TableDefinition, T, O: OutputFormat, R: ReturnValue, C: ConditionState>
 
 // -- Return-value transitions (preserve O, C) -------------------------------
 
-impl<TD: TableDefinition, T: DeserializeOwned, O: OutputFormat, C: ConditionState>
+impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     PutItemRequest<TD, T, O, ReturnNothing, C>
 {
     /// Requests that DynamoDB return the item's previous attributes after the put.
@@ -178,7 +178,7 @@ impl<TD: TableDefinition, T: DeserializeOwned, O: OutputFormat, C: ConditionStat
     }
 }
 
-impl<TD: TableDefinition, T: DeserializeOwned, O: OutputFormat, C: ConditionState>
+impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     PutItemRequest<TD, T, O, Return<Old>, C>
 {
     /// Reverts the return-value setting so that nothing is returned.

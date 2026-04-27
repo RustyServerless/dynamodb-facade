@@ -182,7 +182,7 @@ impl<TD: TableDefinition, T, O: OutputFormat, R: ReturnValue, C: ConditionState>
 // -- Return-value transitions (preserve O, C) -------------------------------
 
 // From ReturnNothing
-impl<TD: TableDefinition, T: DeserializeOwned, O: OutputFormat, C: ConditionState>
+impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     UpdateItemRequest<TD, T, O, ReturnNothing, C>
 {
     /// Requests that DynamoDB return the item's attributes before the update.
@@ -245,7 +245,7 @@ impl<TD: TableDefinition, T: DeserializeOwned, O: OutputFormat, C: ConditionStat
 }
 
 // From ReturnItem<New>
-impl<TD: TableDefinition, T: DeserializeOwned, O: OutputFormat, C: ConditionState>
+impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     UpdateItemRequest<TD, T, O, Return<New>, C>
 {
     /// Switches from returning the post-update item to returning the
@@ -316,7 +316,7 @@ impl<TD: TableDefinition, T: DeserializeOwned, O: OutputFormat, C: ConditionStat
 }
 
 // From ReturnItem<Old>
-impl<TD: TableDefinition, T: DeserializeOwned, O: OutputFormat, C: ConditionState>
+impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     UpdateItemRequest<TD, T, O, Return<Old>, C>
 {
     /// Switches from returning the pre-update item to returning the

@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - `Projection::keys_only()` constructor for building a key-only projection (PK, plus SK on composite-key tables) without supplying any extra attribute names.
 
+### Changed
+
+- Removed over-restrictive `DeserializeOwned` bounds from request constructors and return-value transitions. Hand-implemented `DynamoDBItem` types that aren't `DeserializeOwned` can now build and configure requests then ask for `.raw()` output ; the bound is still enforced at the "Typed" terminal step where deserialization actually happens.
+
 ### Fixed
 
 - Crate-level documentation in `lib.rs` listed only four `Error` variants; updated to enumerate all five (`DynamoDB`, `Serde`, `FailedBatchWrite`, `Other`, `Custom`).
