@@ -330,19 +330,24 @@ user.put(client)
 ## FAQ
 
 **Why a facade, not a `#[derive(DynamoDBItem)]` proc macro?**
+
 Declarative macros (`dynamodb_item!`, `table_definitions!`, `attribute_definitions!`) cover today's surface with straightforward, readable expansions. A derive-style proc macro may be on the roadmap but is deliberately not the first deliverable: the declarative form keeps compile times low-ish, stays ergonomic for the common cases, and leaves room for the proc macro to reuse the same underlying traits without locking down the design.
 
 **Is single-table design required?**
+
 No. The crate has first-class support for the mono-table pattern (PK + SK with a type discriminator) because that's the author's main use-case, but nothing in the API assumes it. Simple-key tables, multiple tables, and the same struct serialised to different tables (useful for migrations) are all supported.
 
 **Can I drop down to the raw AWS SDK when I need to?**
+
 Yes. Every builder has an `.into_inner()` method returning the underlying `aws_sdk_dynamodb` fluent builder, and the crate re-exports `aws_sdk_dynamodb::{Client, Error as DynamoDBError, types::AttributeValue}` so you do not need to pin the SDK version separately.
 
 **How are conditional-check failures surfaced?**
+
 As `Error::DynamoDB(ConditionalCheckFailedException(_))`. Use `error.as_dynamodb_error()` to downcast and match on specific SDK error types. See the error-handling example in [crate docs](https://docs.rs/dynamodb-facade).
 
 **Does it work on AWS Lambda / inside async runtimes?**
-Yes — the crate builds on `tokio` and `futures`, identical to `aws-sdk-dynamodb` itself. It adds no runtime of its own.
+
+Yes. The crate builds on `tokio` and `futures`, identical to `aws-sdk-dynamodb` itself. It adds no runtime of its own.
 
 ---
 
@@ -350,7 +355,7 @@ Yes — the crate builds on `tokio` and `futures`, identical to `aws-sdk-dynamod
 
 Publicly tracked on the issue tracker. The larger items currently planned:
 
-- **API stabilisation toward 1.0** — minor breaking changes are still possible in the `0.x` line while the API settles.
+- **API stabilisation toward 1.0**, minor breaking changes are still possible in the `0.x` line while the API settles.
 
 You have a suggestion? Please **do** send an issue my way!
 

@@ -30,17 +30,17 @@ pub type Result<T> = core::result::Result<T, Error>;
 ///
 /// # Variants
 ///
-/// - [`Error::DynamoDB`] — an error originating from the AWS SDK, such as a
+/// - [`Error::DynamoDB`]: an error originating from the AWS SDK, such as a
 ///   `ConditionalCheckFailedException`, a throttling error, or a network
 ///   failure. Use [`Error::as_dynamodb_error`] to inspect the underlying
 ///   [`aws_sdk_dynamodb::Error`].
-/// - [`Error::Serde`] — a (de)serialization failure produced by
+/// - [`Error::Serde`]: a (de)serialization failure produced by
 ///   [`serde_dynamo`] when converting between Rust types and DynamoDB items.
-/// - [`Error::Other`] — any other boxed [`core::error::Error`]. Useful for
+/// - [`Error::Other`]: any other boxed [`core::error::Error`]. Useful for
 ///   wrapping domain errors via [`Error::other`].
-/// - [`Error::FailedBatchWrite`] — a batch write that could not complete
+/// - [`Error::FailedBatchWrite`]: a batch write that could not complete
 ///   after all retry attempts. Contains the unprocessed [`WriteRequest`]s.
-/// - [`Error::Custom`] — a plain string error message. Useful for quick
+/// - [`Error::Custom`]: a plain string error message. Useful for quick
 ///   ad-hoc errors via [`Error::custom`].
 ///
 /// # Examples
