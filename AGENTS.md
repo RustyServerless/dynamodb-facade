@@ -24,6 +24,7 @@ All clippy + doc warnings are errors (`-D warnings`). Clippy's
 on **stable**, not MSRV, or the lint is silent.
 
 Single test / module:
+
 ```sh
 cargo test --all-features <test_name>
 cargo test --all-features expressions::utils::tests
@@ -47,6 +48,7 @@ cargo test --all-features expressions::utils::tests
 ### Test layout
 
 Three integration-test binaries under `tests/`:
+
 - `macros.rs` — macro expansion tests, no features needed.
 - `try_build.rs` — trybuild compile-pass/compile-fail tests in `tests/try_build/`.
 - `operations.rs` — end-to-end CRUD/query/batch/transactions against
@@ -72,7 +74,7 @@ publishes to crates.io on `v*` tags.
 - `expressions/` — `Condition`, `Update`, `KeyCondition`, `Projection`,
   builder traits (see below).
 - `operations/` — per-verb request builders + pagination + batch + transactions
-  + typestate markers.
+  - typestate markers.
 
 ### Trait hierarchy (blanket-impl chain)
 
@@ -172,11 +174,13 @@ All three dimensions are fully orthogonal: every transition preserves the
 other typestate parameters.
 
 Type-parameter order (matters for `Type::<TD>` turbofish):
+
 - put / delete / update: `<TD, T, O, R, C>`
 - get: `<TD, T, O, P>`
 - query / scan: `<TD, T, O, F, P>`
 
 Each builder structure:
+
 1. `pub fn new(...)` — stand-alone constructor (`T = ()`, `O = Raw`).
 2. `impl<...> Builder<...>` — shared methods (`into_inner()`).
 3. Per-state `impl` blocks — transitioning methods consume `self`.

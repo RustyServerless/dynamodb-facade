@@ -89,11 +89,11 @@ These are the same checks that run in CI, so **if your commit passes locally, it
 
 GitHub Actions runs three parallel jobs on every push and pull request:
 
-| Job | Toolchain | What it checks |
-|---|---|---|
-| **Lint** | stable | `cargo fmt`, `cargo clippy` (with MSRV enforcement), `cargo doc` |
-| **Test** | stable | `cargo test` |
-| **MSRV Check** | 1.85.0 | `cargo check` and `cargo test` compile and pass on the declared MSRV |
+| Job            | Toolchain | What it checks                                                       |
+| -------------- | --------- | -------------------------------------------------------------------- |
+| **Lint**       | stable    | `cargo fmt`, `cargo clippy` (with MSRV enforcement), `cargo doc`     |
+| **Test**       | stable    | `cargo test`                                                         |
+| **MSRV Check** | 1.85.0    | `cargo check` and `cargo test` compile and pass on the declared MSRV |
 
 Clippy runs on **stable** (not on the MSRV toolchain) so that the `incompatible_msrv` lint can detect usage of APIs introduced after the declared MSRV.
 

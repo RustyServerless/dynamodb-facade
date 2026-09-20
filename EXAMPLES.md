@@ -161,7 +161,7 @@ index_definitions! {
     /////////
     // Index with partition key only (simple key).
     /////////
-    
+
     /// Index on item type — query all items of a given type.
     #[table = PlatformTable]
     TypeIndex {
@@ -172,7 +172,7 @@ index_definitions! {
     /////////
     // Index with partition key only.
     /////////
-    
+
     /// Index on email — look up any item by email.
     #[table = PlatformTable]
     EmailIndex {
@@ -183,7 +183,7 @@ index_definitions! {
     /////////
     // Index with composite key.
     /////////
-    
+
     /// Index on searchable ID + type — composite key index.
     #[table = PlatformTable]
     IdTypeIndex {
@@ -270,9 +270,9 @@ dynamodb_item! {
 the DynamoDB attribute string from that ID. Access via `KeyId::pk(user_id)`.
 
 `#[marker_only]` signals attributes that are already part of the type serialization
-and prevents the macro from adding the attribute to the 
+and prevents the macro from adding the attribute to the
 `DynamoDBItem::AdditionalAttributes` associated type. It stills implement `HasAttribute`
-on the type, signaling it is part of an index (in this example, `User` becomes part of 
+on the type, signaling it is part of an index (in this example, `User` becomes part of
 `EmailIndex` from the type-system perpective).
 
 ### 2.3 Variable PK + Variable SK (Hierarchical)
@@ -439,6 +439,7 @@ let enrollment = Enrollment::get(client, KeyId::pk(user_id).sk(course_id)).await
 ```
 
 **Raw SDK equivalent:**
+
 ```rust
 // 16 lines of boilerplate per get:
 let resp = client.get_item()
@@ -478,6 +479,7 @@ new_user.put(client).not_exists().await?;
 ```
 
 **Raw SDK equivalent:**
+
 ```rust
 client.put_item()
     .table_name(table_name())
@@ -541,6 +543,7 @@ User::update_by_id(
 ```
 
 **Raw SDK equivalent:**
+
 ```rust
 client.update_item()
     .table_name(table_name())
@@ -625,6 +628,7 @@ User::update_by_id(client, KeyId::pk(user_id), Update::init_increment("enrollmen
 ```
 
 **Raw SDK equivalent for init_increment:**
+
 ```rust
 // .update_expression("SET #enrollments = if_not_exists(#enrollments, :zero) + :one")
 // .expression_attribute_names("#enrollments", "enrollments")
@@ -746,6 +750,7 @@ let user_by_id_and_type /* : Vec<User> */ =
 ```
 
 **Raw-level index query (when entity type doesn't match):**
+
 ```rust
 use dynamodb_facade::QueryRequest;
 
@@ -766,6 +771,7 @@ Query all items of a given type via the TypeIndex:
 let all_users /* : Vec<User> */ =
     User::query_all_index::<TypeIndex>(client).all().await?;
 ```
+
 `query_all_index` is available when the type has `HasConstAttribute` for the PK of the queried index (`HasConstAttribute<ItemType>` in this example).
 
 ---
@@ -782,6 +788,7 @@ let active_users /* : Vec<User> */ = User::scan(client)
 ```
 
 **Raw SDK equivalent:**
+
 ```rust
 // Manual pagination loop with:
 // .filter_expression("#role = :role")
@@ -1033,6 +1040,7 @@ Typestate prevents calling SK methods on simple-key schemas at compile time.
 // Will fail to compile because EmailIndex have no SortKey:
 User::index_key_condition::<EmailIndex>(user_email).sk_begins_with("EMAIL#")
 ```
+
 ---
 
 ## 9. Batch Operations
@@ -1093,6 +1101,7 @@ dynamodb_batch_write::<PlatformTable>(client, requests).await?;
 ```
 
 **Raw SDK equivalent (batch write with 25-item chunking + retry):**
+
 ```rust
 // ~50 lines: manual WriteRequest::builder().put_request(...) / .delete_request(...),
 // chunks(25), tokio::spawn per chunk, UnprocessedItems retry loop
@@ -1275,7 +1284,7 @@ Error::other(some_std_error)
 ## 12. Item Inspection APIs
 
 `Item<TD>` provides type-safe attribute access and key manipulation.
-It is designed to *always be* a valid item for the table schema:
+It is designed to _always be_ a valid item for the table schema:
 
 ```rust
 let item: Item<PlatformTable> = /* from any request `.raw()` */;
@@ -1312,6 +1321,7 @@ Every operation builder uses compile-time typestates to prevent misuse. Here is
 a visual summary:
 
 **PutItemRequest:**
+
 ```
 put(client)                           → PutItemRequest<Typed, ReturnNothing, NoCondition>
   .not_exists() / .condition(cond)    → ...<..., AlreadyHasCondition>   (one-shot)
@@ -1322,6 +1332,7 @@ put(client)                           → PutItemRequest<Typed, ReturnNothing, N
 ```
 
 **GetItemRequest:**
+
 ```
 get(client, key_id)                   → GetItemRequest<Typed, NoProjection>
   .raw()                              → ...<Raw, ...>
@@ -1331,6 +1342,7 @@ get(client, key_id)                   → GetItemRequest<Typed, NoProjection>
 ```
 
 **UpdateItemRequest:**
+
 ```
 update_by_id(client, key_id, update)  → UpdateItemRequest<Typed, Return<New>, NoCondition>
   .exists() / .condition(cond)        → ...<..., AlreadyHasCondition>
@@ -1342,6 +1354,7 @@ update_by_id(client, key_id, update)  → UpdateItemRequest<Typed, Return<New>, 
 ```
 
 **QueryRequest / ScanRequest:**
+
 ```
 query(client, key_cond)               → QueryRequest<Typed, NoFilter, NoProjection>
   .filter(cond)                       → ...<..., AlreadyHasFilter, ...>
@@ -1352,6 +1365,7 @@ query(client, key_cond)               → QueryRequest<Typed, NoFilter, NoProjec
 ```
 
 **TransactWriteItem builders:**
+
 ```
 transact_put() / transact_delete() / transact_update()
   .condition(cond) / .exists() / .not_exists()  → ...<AlreadyHasCondition>
@@ -1367,15 +1381,15 @@ does not have the `.condition()` / `.filter()` method.
 
 ## Summary — Why dynamodb-facade?
 
-| Concern | Raw `aws-sdk-dynamodb` | `dynamodb-facade` |
-|---|---|---|
-| **Key construction** | Manual `HashMap<String, AV>`, format strings | `KeyId::pk(id).sk(id)`, type-checked |
-| **Expressions** | Raw strings (`"SET #n = :v"`), separate name/value maps | `Update::set("n", v)`, auto-managed placeholders |
-| **Conditions** | String concatenation, manual `:placeholder` tracking | `Condition::eq(...)`, `&` / `\|` operators |
-| **Serialization** | Manual `serde_dynamo` calls, `AttributeValue::S(...)` | Automatic via `DynamoDBItem` trait |
-| **Pagination** | Hand-written `ExclusiveStartKey` loops | `.all()` auto-paginates, `.stream()` for lazy |
-| **Batch writes** | Manual 25-item chunking, retry loop | `dynamodb_batch_write()` handles everything |
-| **Transactions** | Raw `TransactWriteItem::builder()` | `.transact_put().condition(...).build()` |
-| **Type safety** | Runtime errors on wrong key/expression | Compile-time typestate enforcement |
-| **Duplicate calls** | Silent runtime bugs | `.condition()` twice = compile error |
-| **Single-table** | No built-in support for type dispatch | `item.attribute::<ItemType>()` + `T::from_item()` |
+| Concern              | Raw `aws-sdk-dynamodb`                                  | `dynamodb-facade`                                 |
+| -------------------- | ------------------------------------------------------- | ------------------------------------------------- |
+| **Key construction** | Manual `HashMap<String, AV>`, format strings            | `KeyId::pk(id).sk(id)`, type-checked              |
+| **Expressions**      | Raw strings (`"SET #n = :v"`), separate name/value maps | `Update::set("n", v)`, auto-managed placeholders  |
+| **Conditions**       | String concatenation, manual `:placeholder` tracking    | `Condition::eq(...)`, `&` / `\|` operators        |
+| **Serialization**    | Manual `serde_dynamo` calls, `AttributeValue::S(...)`   | Automatic via `DynamoDBItem` trait                |
+| **Pagination**       | Hand-written `ExclusiveStartKey` loops                  | `.all()` auto-paginates, `.stream()` for lazy     |
+| **Batch writes**     | Manual 25-item chunking, retry loop                     | `dynamodb_batch_write()` handles everything       |
+| **Transactions**     | Raw `TransactWriteItem::builder()`                      | `.transact_put().condition(...).build()`          |
+| **Type safety**      | Runtime errors on wrong key/expression                  | Compile-time typestate enforcement                |
+| **Duplicate calls**  | Silent runtime bugs                                     | `.condition()` twice = compile error              |
+| **Single-table**     | No built-in support for type dispatch                   | `item.attribute::<ItemType>()` + `T::from_item()` |
