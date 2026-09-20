@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use dynamodb_facade::{dynamodb_item, test_fixtures::*};
+use dynamodb_facade::dynamodb_item;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {

@@ -9,7 +9,7 @@
 // The compiler rejects the call with "no method named `sk_eq`".
 
 use dynamodb_facade::test_fixtures::*;
-use dynamodb_facade::{DynamoDBItemOp, KeyId, Projection};
+use dynamodb_facade::{DynamoDBItemOp, KeyId};
 
 fn test(client: dynamodb_facade::Client) {
     let _ = User::get(client, KeyId::pk("u-1").sk("oops")); // <-- compile error here

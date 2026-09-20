@@ -1,4 +1,5 @@
 <!-- PROJECT SHIELDS -->
+
 [![crates.io](https://img.shields.io/crates/v/dynamodb-facade.svg)](https://crates.io/crates/dynamodb-facade)
 [![docs.rs](https://docs.rs/dynamodb-facade/badge.svg)](https://docs.rs/dynamodb-facade/latest/dynamodb_facade)
 [![CI](https://github.com/RustyServerless/dynamodb-facade/workflows/CI/badge.svg)](https://github.com/RustyServerless/dynamodb-facade/actions)
@@ -357,7 +358,7 @@ You have a suggestion? Please **do** send an issue my way!
 
 ## Minimum Supported Rust Version
 
-This crate requires Rust **1.85.0** or later (edition 2024). MSRV changes will be treated as a minor version bump until `1.0`, and as a breaking change after.
+This crate requires Rust **1.88.0** or later (edition 2024). MSRV changes will be treated as a minor version bump until `1.0`, and as a breaking change after.
 
 ---
 

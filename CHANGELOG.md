@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Bumped MSRV to 1.88 and re-fixing try_build tests outputs
+
 ## [0.1.1] - 2026-04-27
 
 ### Added
@@ -47,10 +51,10 @@ First public release on crates.io. `dynamodb-facade` is a typed facade over [`aw
 
 [docs.rs]: https://docs.rs/dynamodb-facade
 
-
 ## [0.0.0] - 2026-02-20
 
 ### Added
+
 - Crate.io placeholder
 
 [0.1.1]: https://github.com/RustyServerless/dynamodb-facade/releases/tag/v0.1.1

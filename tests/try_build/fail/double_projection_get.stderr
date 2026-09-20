@@ -5,7 +5,7 @@ error[E0599]: no method named `project` found for struct `GetItemRequest<dynamod
    |  _____________-
 16 | |         .project(Projection::<PlatformTable>::new(["name"]))
 17 | |         .project(Projection::<PlatformTable>::new(["email"])); // <-- compile error here
-   | |         -^^^^^^^ method not found in `GetItemRequest<dynamodb_facade::test_fixtures::PlatformTable, dynamodb_facade::test_fixtures::User, Raw, AlreadyHasProjection>`
+   | |         -^^^^^^^ method not found in `GetItemRequest<PlatformTable, User, Raw, AlreadyHasProjection>`
    | |_________|
    |
    |

@@ -19,11 +19,3 @@ error: `dynamodb_item!` expected:
    | |_^
    |
    = note: this error originates in the macro `$crate::dynamodb_item` which comes from the expansion of the macro `dynamodb_item` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-warning: unused import: `test_fixtures::*`
- --> tests/try_build/fail/dynamodb_item_multiple_sk.rs:3:38
-  |
-3 | use dynamodb_facade::{dynamodb_item, test_fixtures::*};
-  |                                      ^^^^^^^^^^^^^^^^
-  |
-  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default

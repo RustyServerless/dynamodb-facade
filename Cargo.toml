@@ -1,7 +1,7 @@
 [package]
 name = "dynamodb-facade"
 version = "0.1.1"
-rust-version = "1.85.0"
+rust-version = "1.88.0"
 edition = "2024"
 authors = ["Jérémie RODON <jeremie.rodon@gmail.com>"]
 license = "MIT"

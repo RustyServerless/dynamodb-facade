@@ -6,7 +6,7 @@ error[E0599]: no method named `condition` found for struct `UpdateItemRequest<Pl
 16 | |         .update(client, Update::set("role", "inspector"))
 17 | |         .condition(Condition::eq("role", "student"))
 18 | |         .condition(Condition::eq("role", "instructor")); // <-- compile error here
-   | |         -^^^^^^^^^ method not found in `UpdateItemRequest<PlatformTable, dynamodb_facade::test_fixtures::User, Typed, ReturnNothing, AlreadyHasCondition>`
+   | |         -^^^^^^^^^ method not found in `UpdateItemRequest<PlatformTable, User, Typed, ReturnNothing, AlreadyHasCondition>`
    | |_________|
    |
    |
