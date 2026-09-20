@@ -36,12 +36,12 @@ if (
     RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps --document-private-items
     ((total_errors += $?))
 
-    # Run tests — include integration tests when Docker is available
+    # Run tests — include dyndb-local-integration tests when Docker is available
     if docker info &>/dev/null; then
-        echo "Running tests (with integration)..."
+        echo "Running tests (with dyndb-local-integration)..."
         cargo test --all-features
     else
-        echo "Running tests (Docker unavailable, skipping integration)..."
+        echo "Running tests (Docker unavailable, skipping dyndb-local-integration)..."
         cargo test --features test-fixtures
     fi
     ((total_errors += $?))

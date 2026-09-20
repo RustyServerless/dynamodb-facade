@@ -32,9 +32,9 @@ cargo test --all-features expressions::utils::tests
 
 ### Feature flags — important
 
-- `--all-features` enables `integration` **and** `test-fixtures`.
-- `integration` — gates everything in `tests/operations.rs` behind
-  `#![cfg(feature = "integration")]`. Requires **Docker** (testcontainers
+- `--all-features` enables `dyndb-local-integration` **and** `test-fixtures`.
+- `dyndb-local-integration` — gates everything in `tests/operations.rs` behind
+  `#![cfg(feature = "dyndb-local-integration")]`. Requires **Docker** (testcontainers
   spins DynamoDB Local). Without Docker these tests don't compile into the
   binary.
 - `test-fixtures` — exposes `dynamodb_facade::test_fixtures` (shared domain
@@ -52,7 +52,7 @@ Three integration-test binaries under `tests/`:
 - `macros.rs` — macro expansion tests, no features needed.
 - `try_build.rs` — trybuild compile-pass/compile-fail tests in `tests/try_build/`.
 - `operations.rs` — end-to-end CRUD/query/batch/transactions against
-  DynamoDB Local. Feature-gated on `integration`. All tests share one
+  DynamoDB Local. Feature-gated on `dyndb-local-integration`. All tests share one
   container via `LazyLock` + per-test random table names (see
   `tests/common/mod.rs`).
 

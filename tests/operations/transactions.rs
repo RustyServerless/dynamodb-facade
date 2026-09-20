@@ -114,7 +114,7 @@ fn assert_transaction_cancelled<T: std::fmt::Debug>(result: Result<T>) {
 // ---------------------------------------------------------------------------
 #[tokio::test]
 async fn transactions() -> Result<()> {
-    let ctx = crate::common::TestContext::new("txn").await;
+    let ctx = crate::TestContext::new("txn").await;
     // Publish the table name to the OnceLock before any DynamoDB call so that
     // `TxnTable::table_name()` can read it.  Each scenario uses its own
     // OnceLock static so parallel tests cannot interfere with each other.

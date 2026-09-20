@@ -87,7 +87,7 @@ dynamodb_item! {
 
 #[tokio::test]
 async fn batch_and_pagination() -> Result<()> {
-    let ctx = crate::common::TestContext::new("bp").await;
+    let ctx = crate::TestContext::new("bp").await;
 
     // Publish the table name to the OnceLock before any DynamoDB call so that
     // `BpTable::table_name()` can read it.  Each scenario uses its own

@@ -389,7 +389,7 @@
 //! - **`test-fixtures`** — exposes the [`test_fixtures`] module outside of
 //!   `cfg(test)` and `cfg(doc)`. Useful for integration test crates that want
 //!   to reuse the domain types defined there.
-//! - **`integration`** — gates integration tests that require a running
+//! - **`dyndb-local-integration`** — gates integration tests that require a running
 //!   DynamoDB Local instance (via `testcontainers`). Not needed for normal
 //!   library use.
 

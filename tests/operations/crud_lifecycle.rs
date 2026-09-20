@@ -122,7 +122,7 @@ fn assert_conditional_check_failed<T: std::fmt::Debug>(result: Result<T>) {
 #[tokio::test]
 async fn crud_lifecycle() -> Result<()> {
     // Spin up the shared DynamoDB Local container and create a fresh table.
-    let ctx = crate::common::TestContext::new("crud").await;
+    let ctx = crate::TestContext::new("crud").await;
 
     // Publish the table name to the OnceLock before any DynamoDB call so that
     // `CrudTable::table_name()` can read it.  Each scenario uses its own

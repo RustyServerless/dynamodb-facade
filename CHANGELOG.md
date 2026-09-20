@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - Bumped MSRV to 1.88 and re-fixing try_build tests outputs
+- Renamed the `integration` feature to `dyndb-local-integration` to clarify its purpose
 
 ## [0.1.1] - 2026-04-27
 

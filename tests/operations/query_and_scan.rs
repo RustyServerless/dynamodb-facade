@@ -140,7 +140,7 @@ dynamodb_item! {
 
 #[tokio::test]
 async fn query_and_scan() -> Result<()> {
-    let ctx = crate::common::TestContext::new("qs").await;
+    let ctx = crate::TestContext::new("qs").await;
 
     // Publish the table name to the OnceLock before any DynamoDB call so that
     // `QsTable::table_name()` can read it.  Each scenario uses its own
