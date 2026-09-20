@@ -4,7 +4,7 @@
 [![docs.rs](https://docs.rs/dynamodb-facade/badge.svg)](https://docs.rs/dynamodb-facade/latest/dynamodb_facade)
 [![CI](https://github.com/RustyServerless/dynamodb-facade/workflows/CI/badge.svg)](https://github.com/RustyServerless/dynamodb-facade/actions)
 [![License](https://img.shields.io/github/license/RustyServerless/dynamodb-facade.svg)](https://github.com/RustyServerless/dynamodb-facade/blob/main/LICENSE)
-[![MSRV](https://img.shields.io/badge/MSRV-1.85.0-blue.svg)](https://github.com/RustyServerless/dynamodb-facade/blob/main/Cargo.toml)
+[![MSRV](https://img.shields.io/badge/MSRV-1.88.0-blue.svg)](https://github.com/RustyServerless/dynamodb-facade/blob/main/Cargo.toml)
 
 # dynamodb-facade
 
@@ -103,7 +103,7 @@ The same compression applies across every operation. A 50-line raw batch-write l
 
 ### Prerequisites
 
-- Rust **1.85.0** or later (edition 2024).
+- Rust **1.88.0** or later (edition 2024).
 - An AWS account and a DynamoDB table, or DynamoDB Local via Docker for
   development.
 
@@ -378,7 +378,7 @@ For PRs — in short:
 3. The pre-commit hook runs the same four checks as CI: `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps --document-private-items`, and `cargo test --all-features`.
 4. Open a PR. If the pre-commit hook passes locally, CI will pass.
 
-CI runs three parallel jobs: **Lint** and **Test** on stable, **MSRV Check** on 1.85.0.
+CI runs three parallel jobs: **Lint** and **Test** on stable, **MSRV Check** on 1.88.0.
 
 ---
 

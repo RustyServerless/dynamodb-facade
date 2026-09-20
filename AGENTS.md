@@ -4,8 +4,8 @@ Rust library: typed facade over `aws-sdk-dynamodb` with expression builders,
 typestate operation builders, and batch/transaction support. Single-table
 (mono-table) friendly.
 
-- **Edition:** 2024 — **MSRV:** 1.85.0 (`Cargo.toml` `rust-version`)
-- **Dev toolchain:** 1.93 (`nix/rust-toolchain.toml`)
+- **Edition:** 2024 — **MSRV:** 1.88.0 (`Cargo.toml` `rust-version`, CI `MSRV` env)
+- **Dev toolchain:** 1.88 (`nix/rust-toolchain.toml`)
 - Pure Cargo; no JS/TS tooling. No `rustfmt.toml` / `clippy.toml`.
 
 ## Build / Lint / Test
@@ -20,7 +20,7 @@ cargo fmt --check \
 ```
 
 All clippy + doc warnings are errors (`-D warnings`). Clippy's
-`incompatible_msrv` lint catches APIs introduced after 1.85.0 — run clippy
+`incompatible_msrv` lint catches APIs introduced after the MSRV — run clippy
 on **stable**, not MSRV, or the lint is silent.
 
 Single test / module:
@@ -57,12 +57,13 @@ Three integration-test binaries under `tests/`:
   `tests/common/mod.rs`).
 
 CI runs three parallel jobs: `lint`, `test` (both on stable, `--all-features`),
-`msrv` (1.85.0, `cargo check` + `cargo test --all-features`). Release
-publishes to crates.io on `v*` tags.
+`msrv` (1.88.0, `cargo check` + `cargo test --all-features`). Release
+publishes to crates.io on `v*` tags. CI only triggers on changes to
+`src/**`, `Cargo.toml`, `Cargo.lock`, `.github/workflows/**`.
 
 ## Module Layout
 
-`src/` has four files + six module directories:
+`src/` has five files + five module directories:
 
 - `lib.rs` — barrel (`mod x; pub use x::*;`) and crate-level `//!` docs.
   Re-exports `aws_sdk_dynamodb::{Client, Error as DynamoDBError, types::AttributeValue}`.
