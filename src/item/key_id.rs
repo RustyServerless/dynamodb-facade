@@ -45,39 +45,39 @@ pub struct NoId;
 ///
 /// Singleton item (constant PK + SK):
 ///
-/// ```
+/// ```no_run
 /// # use dynamodb_facade::test_fixtures::*;
 /// use dynamodb_facade::{DynamoDBItemOp, KeyId};
 ///
-/// # async fn example(client: dynamodb_facade::Client) -> dynamodb_facade::Result<()> {
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// // PlatformConfig has const PK and SK — use KeyId::NONE.
-/// let config = PlatformConfig::get(client, KeyId::NONE).await?;
+/// let config = PlatformConfig::get(KeyId::NONE).await?;
 /// # Ok(())
 /// # }
 /// ```
 ///
 /// Variable PK, constant SK:
 ///
-/// ```
+/// ```no_run
 /// # use dynamodb_facade::test_fixtures::*;
 /// use dynamodb_facade::{DynamoDBItemOp, KeyId};
 ///
-/// # async fn example(client: dynamodb_facade::Client) -> dynamodb_facade::Result<()> {
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// // User has a PK and a const SK.
-/// let user = User::get(client, KeyId::pk("user-1")).await?;
+/// let user = User::get(KeyId::pk("user-1")).await?;
 /// # Ok(())
 /// # }
 /// ```
 ///
 /// Variable PK + variable SK:
 ///
-/// ```
+/// ```no_run
 /// # use dynamodb_facade::test_fixtures::*;
 /// use dynamodb_facade::{DynamoDBItemOp, KeyId};
 ///
-/// # async fn example(client: dynamodb_facade::Client) -> dynamodb_facade::Result<()> {
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// // Enrollment has a PK and a SK.
-/// let user_enrollment = Enrollment::get(client, KeyId::pk("user-1").sk("course-42")).await?;
+/// let user_enrollment = Enrollment::get(KeyId::pk("user-1").sk("course-42")).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -126,7 +126,7 @@ impl<PkId> KeyId<PkId, NoId> {
     /// ```
     /// use dynamodb_facade::KeyId;
     ///
-    /// let key_id: KeyId<&str, &str>  = KeyId::pk("user-1").sk("course-42");
+    /// let key_id: KeyId<&str, &str> = KeyId::pk("user-1").sk("course-42");
     /// ```
     pub fn sk<SkId>(self, sk: SkId) -> KeyId<PkId, SkId> {
         KeyId { pk: self.pk, sk }

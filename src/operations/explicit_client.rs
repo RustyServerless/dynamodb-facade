@@ -1,35 +1,24 @@
-mod batch;
-mod delete;
-pub mod explicit_client;
-mod get;
-mod pagination;
-mod put;
-mod query;
-mod scan;
-mod transactions;
-mod type_state;
-mod update;
+//! Explicit-client variant of the operation entry points.
+//!
+//! The [`DynamoDBItemOp`] trait defined here mirrors the crate-root
+//! [`DynamoDBItemOp`](crate::DynamoDBItemOp) trait method-for-method, but
+//! every I/O method takes an [`aws_sdk_dynamodb::Client`] as its first argument
+//! instead of relying on the process-global client installed via
+//! [`init_global_client`](crate::init_global_client).
+//!
+//! Use this trait when you don't want a process-global client — for example
+//! when juggling multiple clients across regions or accounts, in tests that
+//! spin up their own client per test, or in libraries that shouldn't own
+//! global state on behalf of their caller.
+//!
+//! Like the default trait, [`DynamoDBItemOp`] here is **blanket-implemented**
+//! for every type implementing [`DynamoDBItem`] — you never implement it manually.
+//! The request builder types it returns (`GetItemRequest`, `PutItemRequest`, `DeleteItemRequest`,
+//! `UpdateItemRequest`, `ScanRequest`, `QueryRequest`) are the exact same
+//! types used by the global-client API in [`crate`]; only how you obtain the
+//! builder differs.
 
-pub use batch::*;
-pub use delete::*;
-pub use get::*;
-pub use pagination::*;
-pub use put::*;
-pub use query::*;
-pub use scan::*;
-pub use transactions::*;
-pub use type_state::*;
-pub use update::*;
-
-use serde::{Serialize, de::DeserializeOwned};
-use std::marker::PhantomData;
-
-use super::{
-    ApplyCondition, ApplyFilter, ApplyKeyCondition, ApplyProjection, ApplyUpdate,
-    AttributeDefinition, Condition, DynamoDBItem, HasAttribute, HasConstAttribute,
-    HasIndexKeyAttributes, IndexDefinition, Item, Key, KeyCondition, KeyConditionState, KeySchema,
-    PartitionKeyDefinition, Projection, Result, TableDefinition, Update, global_client,
-};
+use super::*;
 
 // ---------------------------------------------------------------------------
 // DynamoDBItemOp trait — typed operation entry points
@@ -69,79 +58,95 @@ use super::{
 ///
 /// ```no_run
 /// # use dynamodb_facade::test_fixtures::*;
-/// use dynamodb_facade::{DynamoDBItemOp, KeyId, Update, Condition};
+/// use dynamodb_facade::{explicit_client::DynamoDBItemOp, KeyId, Update, Condition};
 ///
-/// # async fn example() -> dynamodb_facade::Result<()> {
+/// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+/// let user = sample_user();
+/// let enrollment = sample_enrollment();
+///
+/// # let client = cclient.clone();
 /// // Get a user by ID
-/// let user /* : Option<User> */ = User::get(KeyId::pk("user-1")).await?;
+/// let fetched /* : Option<User> */ = User::get(client, KeyId::pk("user-1")).await?;
 ///
+/// # let client = cclient.clone();
 /// // Get with consistent read
-/// let user /* : Option<User> */ = User::get(KeyId::pk("user-1"))
+/// let fetched /* : Option<User> */ = User::get(client, KeyId::pk("user-1"))
 ///     .consistent_read()
 ///     .await?;
 ///
+/// # let client = cclient.clone();
 /// // Put a new user (unconditional)
-/// let new_user = sample_user();
-/// new_user.put().await?;
+/// user.put(client).await?;
 ///
+/// # let client = cclient.clone();
 /// // Put a new user (create-only)
-/// new_user.put().not_exists().await?;
+/// user.put(client).not_exists().await?;
 ///
+/// # let client = cclient.clone();
 /// // Put with a custom condition
-/// new_user
-///     .put()
+/// user.put(client)
 ///     .condition(User::not_exists() | Condition::lt("expiration_timestamp", 1_700_000_000))
 ///     .await?;
 ///
-/// # let new_user = sample_user();
+/// # let client = cclient.clone();
 /// // Put and return the old item
-/// let old /* : Option<User> */ = new_user.put().return_old().await?;
+/// let old /* : Option<User> */ = user.put(client).return_old().await?;
 ///
+/// # let client = cclient.clone();
 /// // Delete an enrollment (unconditional)
-/// let enrollment = sample_enrollment();
-/// enrollment.delete().await?;
+/// enrollment.delete(client).await?;
 ///
+/// # let client = cclient.clone();
 /// // Delete only if the item exists
-/// enrollment.delete().exists().await?;
+/// enrollment.delete(client).exists().await?;
 ///
+/// # let client = cclient.clone();
 /// // Delete with a custom condition
 /// enrollment
-///     .delete()
+///     .delete(client)
 ///     .condition(Enrollment::exists() & Condition::not_exists("completed_at"))
 ///     .await?;
 ///
+/// # let client = cclient.clone();
 /// // Delete by ID and return the old item
 /// let old /* : Option<Enrollment> */ = Enrollment::delete_by_id(
+///     client,
 ///     KeyId::pk("user-1").sk("course-42"),
 /// )
 /// .exists()
 /// .await?;
 ///
+/// # let client = cclient.clone();
 /// // Update a user's role (fire-and-forget)
-/// let new_user = sample_user();
-/// new_user
-///     .update(Update::set("role", "instructor"))
+/// user
+///     .update(client, Update::set("role", "instructor"))
 ///     .exists()
 ///     .await?;
 ///
+/// # let client = cclient.clone();
 /// // Update by ID and return the updated item (default for update_by_id)
 /// let updated /* : User */ = User::update_by_id(
+///     client,
 ///     KeyId::pk("user-1"),
 ///     Update::set("name", "Bob"),
 /// )
 /// .exists()
 /// .await?;
 ///
+/// # let client = cclient.clone();
 /// // Update with a custom condition
 /// let updated /* : User */ = User::update_by_id(
+///     client,
 ///     KeyId::pk("user-1"),
 ///     Update::set("role", "instructor"),
 /// )
 /// .condition(Condition::eq("role", "student"))
 /// .await?;
 ///
+/// # let client = cclient.clone();
 /// // Update without returning the item
 /// User::update_by_id(
+///     client,
 ///     KeyId::pk("user-1"),
 ///     Update::set("name", "Bob"),
 /// )
@@ -149,14 +154,16 @@ use super::{
 /// .return_none()
 /// .await?;
 ///
+/// # let client = cclient.clone();
 /// // Query all enrollments for a user
 /// let enrollments /* : Vec<Enrollment> */ =
-///     Enrollment::query(Enrollment::key_condition("user-1"))
+///     Enrollment::query(client, Enrollment::key_condition("user-1"))
 ///         .all()
 ///         .await?;
 ///
+/// # let client = cclient.clone();
 /// // Scan all users with a filter
-/// let instructors /* : Vec<User> */ = User::scan()
+/// let instructors /* : Vec<User> */ = User::scan(client)
 ///     .filter(Condition::eq("role", "instructor"))
 ///     .all()
 ///     .await?;
@@ -177,21 +184,26 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```no_run
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::{DynamoDBItemOp, KeyId};
+    /// use dynamodb_facade::{explicit_client::DynamoDBItemOp, KeyId};
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # let client = cclient.clone();
     /// // Simple get by ID
-    /// let user /* : Option<User> */ = User::get(KeyId::pk("user-1")).await?;
+    /// let user /* : Option<User> */ = User::get(client, KeyId::pk("user-1")).await?;
     ///
+    /// # let client = cclient.clone();
     /// // Consistent read
-    /// let user /* : Option<User> */ = User::get(KeyId::pk("user-1"))
+    /// let user /* : Option<User> */ = User::get(client, KeyId::pk("user-1"))
     ///     .consistent_read()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    fn get(key_id: Self::KeyId<'_>) -> GetItemRequest<TD, Self, Typed> {
-        GetItemRequest::_new(global_client(), Self::get_key_from_id(key_id))
+    fn get(
+        client: aws_sdk_dynamodb::Client,
+        key_id: Self::KeyId<'_>,
+    ) -> GetItemRequest<TD, Self, Typed> {
+        GetItemRequest::_new(client, Self::get_key_from_id(key_id))
     }
 
     /// Returns a [`PutItemRequest`] builder in `Typed` output mode with
@@ -214,32 +226,36 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```no_run
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::{DynamoDBItemOp, Condition};
+    /// use dynamodb_facade::{explicit_client::DynamoDBItemOp, Condition};
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
     /// let user = sample_user();
     ///
+    /// # let client = cclient.clone();
     /// // Unconditional put (overwrites any existing item)
-    /// user.put().await?;
+    /// user.put(client).await?;
     ///
+    /// # let client = cclient.clone();
     /// // Create-only: fails if item already exists
-    /// user.put().not_exists().await?;
+    /// user.put(client).not_exists().await?;
     ///
+    /// # let client = cclient.clone();
     /// // Custom condition: create-only OR expired TTL
-    /// user.put()
+    /// user.put(client)
     ///     .condition(User::not_exists() | Condition::lt("expiration_timestamp", 1_700_000_000))
     ///     .await?;
     ///
+    /// # let client = cclient.clone();
     /// // Put and return the old item
-    /// let old /* : Option<User> */ = user.put().return_old().await?;
+    /// let old /* : Option<User> */ = user.put(client).return_old().await?;
     /// # Ok(())
     /// # }
     /// ```
-    fn put(&self) -> PutItemRequest<TD, Self, Typed>
+    fn put(&self, client: aws_sdk_dynamodb::Client) -> PutItemRequest<TD, Self, Typed>
     where
         Self: Serialize,
     {
-        PutItemRequest::_new(global_client(), self.to_item())
+        PutItemRequest::_new(client, self.to_item())
     }
 
     /// Returns a [`DeleteItemRequest`] builder in `Typed` output mode with
@@ -255,30 +271,34 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```no_run
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::{DynamoDBItemOp, Condition};
+    /// use dynamodb_facade::{explicit_client::DynamoDBItemOp, Condition};
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
     /// let enrollment = sample_enrollment();
     ///
+    /// # let client = cclient.clone();
     /// // Unconditional delete
-    /// enrollment.delete().await?;
+    /// enrollment.delete(client).await?;
     ///
+    /// # let client = cclient.clone();
     /// // Delete only if the item exists
-    /// enrollment.delete().exists().await?;
+    /// enrollment.delete(client).exists().await?;
     ///
+    /// # let client = cclient.clone();
     /// // Delete with a custom condition
     /// enrollment
-    ///     .delete()
+    ///     .delete(client)
     ///     .condition(Enrollment::exists() & Condition::not_exists("completed_at"))
     ///     .await?;
     ///
+    /// # let client = cclient.clone();
     /// // Delete and return the old item
-    /// let old /* : Option<Enrollment> */ = enrollment.delete().return_old().await?;
+    /// let old /* : Option<Enrollment> */ = enrollment.delete(client).return_old().await?;
     /// # Ok(())
     /// # }
     /// ```
-    fn delete(&self) -> DeleteItemRequest<TD, Self, Typed> {
-        DeleteItemRequest::_new(global_client(), self.get_key())
+    fn delete(&self, client: aws_sdk_dynamodb::Client) -> DeleteItemRequest<TD, Self, Typed> {
+        DeleteItemRequest::_new(client, self.get_key())
     }
 
     /// Returns a [`DeleteItemRequest`] builder in `Typed` output mode with
@@ -298,31 +318,39 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```no_run
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::{DynamoDBItemOp, Condition, KeyId};
+    /// use dynamodb_facade::{explicit_client::DynamoDBItemOp, Condition, KeyId};
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # let client = cclient.clone();
     /// // Simple delete by ID (returns the old item by default)
     /// let old /* : Option<Enrollment> */ = Enrollment::delete_by_id(
+    ///     client,
     ///     KeyId::pk("user-1").sk("course-42"),
     /// )
     /// .await?;
     ///
+    /// # let client = cclient.clone();
     /// // Delete only if the item exists
     /// let old /* : Option<Enrollment> */ = Enrollment::delete_by_id(
+    ///     client,
     ///     KeyId::pk("user-1").sk("course-42"),
     /// )
     /// .exists()
     /// .await?;
     ///
+    /// # let client = cclient.clone();
     /// // Delete with a custom condition
     /// let old /* : Option<Enrollment> */ = Enrollment::delete_by_id(
+    ///     client,
     ///     KeyId::pk("user-1").sk("course-42"),
     /// )
     /// .condition(Enrollment::exists() & Condition::not_exists("completed_at"))
     /// .await?;
     ///
+    /// # let client = cclient.clone();
     /// // Delete without returning the old item
     /// Enrollment::delete_by_id(
+    ///     client,
     ///     KeyId::pk("user-1").sk("course-42"),
     /// )
     /// .return_none()
@@ -330,8 +358,11 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     /// # Ok(())
     /// # }
     /// ```
-    fn delete_by_id(key_id: Self::KeyId<'_>) -> DeleteItemRequest<TD, Self, Typed, Return<Old>> {
-        DeleteItemRequest::_new(global_client(), Self::get_key_from_id(key_id)).return_old()
+    fn delete_by_id(
+        client: aws_sdk_dynamodb::Client,
+        key_id: Self::KeyId<'_>,
+    ) -> DeleteItemRequest<TD, Self, Typed, Return<Old>> {
+        DeleteItemRequest::_new(client, Self::get_key_from_id(key_id)).return_old()
     }
 
     /// Returns an [`UpdateItemRequest`] builder in `Typed` output mode with
@@ -348,35 +379,43 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```no_run
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::{DynamoDBItemOp, Condition, Update};
+    /// use dynamodb_facade::{explicit_client::DynamoDBItemOp, Condition, Update};
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
     /// let user = sample_user();
     ///
+    /// # let client = cclient.clone();
     /// // Simple update (fire-and-forget)
-    /// user.update(Update::set("role", "instructor")).await?;
+    /// user.update(client, Update::set("role", "instructor")).await?;
     ///
+    /// # let client = cclient.clone();
     /// // Update guarded by existence
-    /// user.update(Update::set("role", "instructor"))
+    /// user.update(client, Update::set("role", "instructor"))
     ///     .exists()
     ///     .await?;
     ///
+    /// # let client = cclient.clone();
     /// // Update with a custom condition
-    /// user.update(Update::set("role", "instructor"))
+    /// user.update(client, Update::set("role", "instructor"))
     ///     .condition(Condition::eq("role", "student"))
     ///     .await?;
     ///
+    /// # let client = cclient.clone();
     /// // Update if exist and return the new item
     /// let updated /* : User */ = user
-    ///     .update(Update::set("name", "Alice B."))
+    ///     .update(client, Update::set("name", "Alice B."))
     ///     .exists()
     ///     .return_new()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    fn update(&self, update: Update<'_>) -> UpdateItemRequest<TD, Self, Typed> {
-        UpdateItemRequest::_new(global_client(), self.get_key(), update)
+    fn update(
+        &self,
+        client: aws_sdk_dynamodb::Client,
+        update: Update<'_>,
+    ) -> UpdateItemRequest<TD, Self, Typed> {
+        UpdateItemRequest::_new(client, self.get_key(), update)
     }
 
     /// Returns an [`UpdateItemRequest`] builder in `Typed` output mode with
@@ -397,34 +436,42 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```no_run
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::{DynamoDBItemOp, Condition, KeyId, Update};
+    /// use dynamodb_facade::{explicit_client::DynamoDBItemOp, Condition, KeyId, Update};
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # let client = cclient.clone();
     /// // Simple update by ID (returns the updated item by default)
     /// let updated /* : User */ = User::update_by_id(
+    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("role", "instructor"),
     /// )
     /// .await?;
     ///
+    /// # let client = cclient.clone();
     /// // Update guarded by existence
     /// let updated /* : User */ = User::update_by_id(
+    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("role", "instructor"),
     /// )
     /// .exists()
     /// .await?;
     ///
+    /// # let client = cclient.clone();
     /// // Update with a custom condition
     /// let updated /* : User */ = User::update_by_id(
+    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("role", "instructor"),
     /// )
     /// .condition(Condition::eq("role", "student"))
     /// .await?;
     ///
+    /// # let client = cclient.clone();
     /// // Update without returning the item
     /// User::update_by_id(
+    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("name", "Bob"),
     /// )
@@ -435,10 +482,11 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     /// # }
     /// ```
     fn update_by_id(
+        client: aws_sdk_dynamodb::Client,
         key_id: Self::KeyId<'_>,
         update: Update<'_>,
     ) -> UpdateItemRequest<TD, Self, Typed, Return<New>> {
-        UpdateItemRequest::_new(global_client(), Self::get_key_from_id(key_id), update)
+        UpdateItemRequest::_new(client, Self::get_key_from_id(key_id), update)
     }
 
     /// Returns a [`ScanRequest`] builder in `Typed` output mode for scanning
@@ -463,22 +511,24 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```no_run
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::{DynamoDBItemOp, Condition};
+    /// use dynamodb_facade::{explicit_client::DynamoDBItemOp, Condition};
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # let client = cclient.clone();
     /// // Scan the table and attempts to project all items as users
-    /// let all_users /* : Vec<User> */ = User::scan().all().await?;
+    /// let all_users /* : Vec<User> */ = User::scan(client).all().await?;
     ///
+    /// # let client = cclient.clone();
     /// // Scan with a filter (prefer using query on an appropriate index)
-    /// let instructors /* : Vec<User> */ = User::scan()
+    /// let instructors /* : Vec<User> */ = User::scan(client)
     ///     .filter(Condition::eq("role", "instructor"))
     ///     .all()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    fn scan() -> ScanRequest<TD, Self, Typed> {
-        ScanRequest::_new(global_client())
+    fn scan(client: aws_sdk_dynamodb::Client) -> ScanRequest<TD, Self, Typed> {
+        ScanRequest::_new(client)
     }
 
     /// Returns a [`ScanRequest`] builder in `Typed` output mode for scanning
@@ -496,29 +546,33 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```no_run
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::{DynamoDBItemOp, Condition};
+    /// use dynamodb_facade::{explicit_client::DynamoDBItemOp, Condition};
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # let client = cclient.clone();
     /// // Scan an index and attempts to project all items as enrollments
     /// let all_enrollments /* : Vec<Enrollment> */ =
-    ///     Enrollment::scan_index::<TypeIndex>()
+    ///     Enrollment::scan_index::<TypeIndex>(client)
     ///         .all()
     ///         .await?;
     ///
+    /// # let client = cclient.clone();
     /// // Scan an index with a filter (prefer using query on an appropriate index)
     /// let recent /* : Vec<Enrollment> */ =
-    ///     Enrollment::scan_index::<TypeIndex>()
+    ///     Enrollment::scan_index::<TypeIndex>(client)
     ///         .filter(Condition::gt("enrolled_at", 1_700_000_000))
     ///         .all()
     ///         .await?;
     /// # Ok(())
     /// # }
     /// ```
-    fn scan_index<I: IndexDefinition<TD>>() -> ScanRequest<TD, Self, Typed>
+    fn scan_index<I: IndexDefinition<TD>>(
+        client: aws_sdk_dynamodb::Client,
+    ) -> ScanRequest<TD, Self, Typed>
     where
         Self: HasIndexKeyAttributes<TD, I>,
     {
-        ScanRequest::_index_new::<I>(global_client())
+        ScanRequest::_index_new::<I>(client)
     }
 
     /// Returns a [`QueryRequest`] builder in `Typed` output mode for querying
@@ -535,19 +589,22 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```no_run
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::{DynamoDBItemOp, Condition, KeyCondition};
+    /// use dynamodb_facade::{explicit_client::DynamoDBItemOp, Condition, KeyCondition};
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # let client = cclient.clone();
     /// // Query all enrollments for a specific user
     /// let enrollments /* : Vec<Enrollment> */ = Enrollment::query(
+    ///     client,
     ///     Enrollment::key_condition("user-1").sk_begins_with("ENROLL#"),
     /// )
     /// .all()
     /// .await?;
     ///
+    /// # let client = cclient.clone();
     /// // Query with a filter
     /// let advanced /* : Vec<Enrollment> */ =
-    ///     Enrollment::query(Enrollment::key_condition("user-1"))
+    ///     Enrollment::query(client, Enrollment::key_condition("user-1"))
     ///         .filter(Condition::gt("progress", 0.5))
     ///         .all()
     ///         .await?;
@@ -555,9 +612,10 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     /// # }
     /// ```
     fn query(
+        client: aws_sdk_dynamodb::Client,
         key_condition: KeyCondition<'_, TD::KeySchema, impl KeyConditionState>,
     ) -> QueryRequest<TD, Self, Typed> {
-        QueryRequest::_new(global_client(), key_condition)
+        QueryRequest::_new(client, key_condition)
     }
 
     /// Returns a [`QueryRequest`] builder in `Typed` output mode, using the
@@ -571,21 +629,21 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```no_run
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::DynamoDBItemOp;
+    /// use dynamodb_facade::explicit_client::DynamoDBItemOp;
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
     /// // Query all items stored under the constant PlatformConfig PK
-    /// let configs /* : Vec<PlatformConfig> */ = PlatformConfig::query_all()
+    /// let configs /* : Vec<PlatformConfig> */ = PlatformConfig::query_all(client)
     ///     .all()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    fn query_all() -> QueryRequest<TD, Self, Typed>
+    fn query_all(client: aws_sdk_dynamodb::Client) -> QueryRequest<TD, Self, Typed>
     where
         Self: HasConstAttribute<<TD::KeySchema as KeySchema>::PartitionKey>,
     {
-        Self::query(KeyCondition::pk(Self::VALUE))
+        Self::query(client, KeyCondition::pk(Self::VALUE))
     }
 
     /// Returns a [`QueryRequest`] builder in `Typed` output mode for querying
@@ -600,11 +658,12 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```no_run
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::{DynamoDBItemOp, KeyCondition};
+    /// use dynamodb_facade::{explicit_client::DynamoDBItemOp, KeyCondition};
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
     /// // Query a secondary index
     /// let users /* : Vec<User> */ = User::query_index::<EmailIndex>(
+    ///     client,
     ///     KeyCondition::pk("alice@example.com".to_owned()),
     /// )
     /// .all()
@@ -613,12 +672,13 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     /// # }
     /// ```
     fn query_index<I: IndexDefinition<TD>>(
+        client: aws_sdk_dynamodb::Client,
         key_condition: KeyCondition<'_, I::KeySchema, impl KeyConditionState>,
     ) -> QueryRequest<TD, Self, Typed>
     where
         Self: HasIndexKeyAttributes<TD, I>,
     {
-        QueryRequest::_index_new::<I>(global_client(), key_condition)
+        QueryRequest::_index_new::<I>(client, key_condition)
     }
 
     /// Returns a [`QueryRequest`] builder in `Typed` output mode for querying
@@ -633,22 +693,24 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```no_run
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::DynamoDBItemOp;
+    /// use dynamodb_facade::explicit_client::DynamoDBItemOp;
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
     /// // Query all users via the TypeIndex (constant ItemType = "USER")
-    /// let all_users /* : Vec<User> */ = User::query_all_index::<TypeIndex>()
+    /// let all_users /* : Vec<User> */ = User::query_all_index::<TypeIndex>(client)
     ///     .all()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    fn query_all_index<I: IndexDefinition<TD>>() -> QueryRequest<TD, Self, Typed>
+    fn query_all_index<I: IndexDefinition<TD>>(
+        client: aws_sdk_dynamodb::Client,
+    ) -> QueryRequest<TD, Self, Typed>
     where
         Self: HasIndexKeyAttributes<TD, I>
             + HasConstAttribute<<I::KeySchema as KeySchema>::PartitionKey>,
     {
-        Self::query_index::<I>(KeyCondition::pk(Self::VALUE))
+        Self::query_index::<I>(client, KeyCondition::pk(Self::VALUE))
     }
 
     // -- Condition helpers ----------------------------------------------------
@@ -665,7 +727,7 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::{DynamoDBItemOp, Condition};
+    /// use dynamodb_facade::{explicit_client::DynamoDBItemOp, Condition};
     ///
     /// // Use as a standalone condition
     /// let cond = User::exists();
@@ -689,7 +751,7 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::{DynamoDBItemOp, Condition};
+    /// use dynamodb_facade::{explicit_client::DynamoDBItemOp, Condition};
     ///
     /// // Use as a standalone condition
     /// let cond = User::not_exists();
@@ -712,14 +774,14 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::DynamoDBItemOp;
+    /// use dynamodb_facade::explicit_client::DynamoDBItemOp;
     ///
-    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
     /// // All enrollments for a user
     /// let kc = Enrollment::key_condition("user-1").sk_begins_with("ENROLL#");
-    /// let enrollments /* : Vec<Enrollment> */ = Enrollment::query(kc)
+    /// let enrollments /* : Vec<Enrollment> */ = Enrollment::query(client, kc)
     ///     .all()
     ///     .await?;
     /// # Ok(())
@@ -743,7 +805,7 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
     ///
     /// ```
     /// # use dynamodb_facade::test_fixtures::*;
-    /// use dynamodb_facade::DynamoDBItemOp;
+    /// use dynamodb_facade::explicit_client::DynamoDBItemOp;
     ///
     /// // Build a key condition for the EmailIndex
     /// let kc = User::index_key_condition::<EmailIndex>("alice@example.com");
@@ -762,3 +824,104 @@ pub trait DynamoDBItemOp<TD: TableDefinition>: DynamoDBItem<TD> {
 }
 
 impl<TD: TableDefinition, DBI: DynamoDBItem<TD>> DynamoDBItemOp<TD> for DBI {}
+
+use aws_sdk_dynamodb::types::WriteRequest;
+use tracing::Instrument;
+/// Executes a batch of `WriteRequest`s against a DynamoDB table.
+///
+/// Handles all the complexity of the DynamoDB batch write API:
+///
+/// - **Chunking** — automatically splits the input into chunks of 25 items
+///   (the DynamoDB maximum per `BatchWriteItem` call).
+/// - **Parallelism** — each chunk is sent concurrently via
+///   [`tokio::spawn`].
+/// - **Retry** — any unprocessed items returned by DynamoDB are retried up
+///   to 3 times total. If items remain unprocessed after all attempts, the
+///   function returns [`Error::FailedBatchWrite`](crate::Error::FailedBatchWrite)
+///   containing the unprocessed [`WriteRequest`]s.
+///
+/// Build `WriteRequest` values using [`DynamoDBItemBatchOp::batch_put`],
+/// [`DynamoDBItemBatchOp::batch_delete`], [`batch_put`], or [`batch_delete`].
+///
+/// # Errors
+///
+/// - Returns [`Error::FailedBatchWrite`](crate::Error::FailedBatchWrite) if
+///   items remain unprocessed after 3 retry attempts.
+/// - Returns [`Error::DynamoDB`](crate::Error::DynamoDB) if any individual
+///   `BatchWriteItem` SDK call fails with a non-retryable error.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use dynamodb_facade::test_fixtures::*;
+/// use dynamodb_facade::{DynamoDBItemBatchOp, explicit_client::dynamodb_batch_write};
+///
+/// # async fn example(
+/// #     client: aws_sdk_dynamodb::Client,
+/// #     enrollments: Vec<Enrollment>,
+/// # ) -> dynamodb_facade::Result<()> {
+/// // Batch put a large collection — chunking and retries are handled automatically
+/// let requests: Vec<_> = enrollments.iter().map(|e| e.batch_put()).collect();
+/// dynamodb_batch_write::<PlatformTable>(client, requests).await?;
+/// # Ok(())
+/// # }
+/// ```
+#[tracing::instrument(level = "debug", skip(client))]
+pub async fn dynamodb_batch_write<TD: TableDefinition>(
+    client: aws_sdk_dynamodb::Client,
+    mut batch_write_requests: Vec<WriteRequest>,
+) -> Result<()> {
+    const MAX_RETRY: usize = 3;
+
+    let table_name = TD::table_name();
+    // Process the Batch(es) in massively parallel fashion
+    // Because Rust.
+    tracing::debug!("putting {} items...", batch_write_requests.len());
+    let mut retry = 0;
+    while !batch_write_requests.is_empty() && retry < MAX_RETRY {
+        retry += 1;
+        tracing::debug!("Try #{retry}/{MAX_RETRY}");
+        let handles = batch_write_requests
+            .chunks(25)
+            .enumerate()
+            .map(|(index, chunk)| {
+                let chunk = chunk.to_vec();
+                let cclient = client.clone();
+                let ctable_name = table_name.clone();
+                tokio::spawn(
+                    async move {
+                        tracing::debug!("Sending BatchWriteItem for chunk #{index}...");
+                        let result = cclient
+                            .batch_write_item()
+                            .set_request_items(Some([(ctable_name, chunk)].into()))
+                            .send()
+                            .await;
+                        tracing::debug!("BatchWriteItem finished for chunk #{index}");
+                        result
+                    }
+                    .instrument(tracing::info_span!("batch_write_chunk", %index, try=retry)),
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut unprocess_vec = Vec::default();
+
+        for h in handles {
+            let batch_output = h.await.expect("batch write task panicked")?;
+            if let Some(unproccessed) = batch_output.unprocessed_items {
+                if !unproccessed.is_empty() {
+                    unprocess_vec.extend(unproccessed.into_iter().flat_map(|e| e.1));
+                }
+            }
+        }
+
+        batch_write_requests = unprocess_vec;
+
+        tracing::debug!("{} items were unprocessed", batch_write_requests.len());
+    }
+
+    if batch_write_requests.is_empty() {
+        Ok(())
+    } else {
+        Err(crate::Error::FailedBatchWrite(batch_write_requests))
+    }
+}

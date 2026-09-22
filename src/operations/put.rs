@@ -8,7 +8,9 @@ use aws_sdk_dynamodb::operation::put_item::builders::PutItemFluentBuilder;
 /// Builder for a DynamoDB `PutItem` request.
 ///
 /// Constructed via [`DynamoDBItemOp::put`] (typed, with a concrete `T`) or
-/// [`PutItemRequest::new`] (stand-alone, raw output). The builder provides:
+/// [`PutItemRequest::new`] / [`PutItemRequest::with_client`] (stand-alone, raw output).
+///
+/// The builder provides:
 ///
 /// - **Output format** — the result can be deserialized into `T`.
 ///   Call [`.raw()`][PutItemRequest::raw] to receive an untyped [`Item<TD>`]
@@ -23,13 +25,13 @@ use aws_sdk_dynamodb::operation::put_item::builders::PutItemFluentBuilder;
 ///   single condition expression per request, so this can only be called once.
 ///
 /// The builder implements [`IntoFuture`], so it can
-/// be `.await`ed directly.
+/// be `.await`ed directly without calling `.execute()` explicitly.
 ///
 /// # Errors
 ///
 /// Returns [`Err`] if the DynamoDB request fails, if a condition expression
-/// is set and the condition check fails
-/// (`ConditionalCheckFailedException`), or if serialization of `self` fails.
+/// is set and the condition check fails (`ConditionalCheckFailedException`),
+/// or if deserialization of the returned attributes fails.
 ///
 /// # Examples
 ///
@@ -37,26 +39,22 @@ use aws_sdk_dynamodb::operation::put_item::builders::PutItemFluentBuilder;
 /// # use dynamodb_facade::test_fixtures::*;
 /// use dynamodb_facade::{DynamoDBItemOp, Condition};
 ///
-/// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// let user = sample_user();
 ///
-/// # let client = cclient.clone();
 /// // Simple put
-/// user.put(client).await?;
+/// user.put().await?;
 ///
-/// # let client = cclient.clone();
 /// // Create-only: fails if item already exists
-/// user.put(client).not_exists().await?;
+/// user.put().not_exists().await?;
 ///
-/// # let client = cclient.clone();
 /// // Custom condition
-/// user.put(client)
+/// user.put()
 ///     .condition(User::not_exists() | Condition::lt("expiration_timestamp", 1_700_000_000))
 ///     .await?;
 ///
-/// # let client = cclient.clone();
 /// // Put and return the old item
-/// let old /* : Option<User> */ = user.put(client).return_old().await?;
+/// let old /* : Option<User> */ = user.put().return_old().await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -89,8 +87,9 @@ impl<TD: TableDefinition, T, R: ReturnValue, O: OutputFormat, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let sdk_builder = sample_user().put(client).into_inner();
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let user = sample_user();
+    /// let sdk_builder = user.put().into_inner();
     /// // configure sdk_builder further, then call .send().await
     /// # Ok(())
     /// # }
@@ -103,7 +102,8 @@ impl<TD: TableDefinition, T, R: ReturnValue, O: OutputFormat, C: ConditionState>
 // -- Stand-alone constructor (ReturnNothing, NoCondition, T = (), O = Raw)
 
 impl<TD: TableDefinition> PutItemRequest<TD, (), Raw> {
-    /// Creates a stand-alone `PutItemRequest` with raw output (`T = ()`, `O = Raw`).
+    /// Creates a stand-alone `PutItemRequest` with raw output (`T = ()`, `O = Raw`) using
+    /// the globally defined [`aws_sdk_dynamodb::Client`].
     ///
     /// Use this when you already have an [`Item<TD>`] and do not need typed
     /// deserialization of the old value. For typed access, prefer
@@ -115,13 +115,36 @@ impl<TD: TableDefinition> PutItemRequest<TD, (), Raw> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::PutItemRequest;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let item = sample_user_item();
-    /// PutItemRequest::<PlatformTable>::new(client, item).await?;
+    /// PutItemRequest::<PlatformTable>::new(item).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(client: aws_sdk_dynamodb::Client, item: Item<TD>) -> Self {
+    pub fn new(item: Item<TD>) -> Self {
+        Self::_new(global_client(), item)
+    }
+
+    /// Creates a stand-alone `PutItemRequest` with raw output (`T = ()`, `O = Raw`) using
+    /// the provided [`aws_sdk_dynamodb::Client`].
+    ///
+    /// Use this when you already have an [`Item<TD>`] and do not need typed
+    /// deserialization of the old value. For typed access, prefer
+    /// [`explicit_client::DynamoDBItemOp::put`] instead.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use dynamodb_facade::test_fixtures::*;
+    /// use dynamodb_facade::PutItemRequest;
+    ///
+    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// let item = sample_user_item();
+    /// PutItemRequest::<PlatformTable>::with_client(client, item).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_client(client: aws_sdk_dynamodb::Client, item: Item<TD>) -> Self {
         Self::_new(client, item)
     }
 }
@@ -162,9 +185,9 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let user = sample_user();
-    /// let old /* : Option<User> */ = user.put(client).return_old().await?;
+    /// let old /* : Option<User> */ = user.put().return_old().await?;
     /// // old is None if this was the first put, Some(prev_user) otherwise
     /// # Ok(())
     /// # }
@@ -192,10 +215,10 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let user = sample_user();
     /// // Start with return_old, then decide we don't need the old value
-    /// user.put(client).return_old().return_none().await?;
+    /// user.put().return_old().return_none().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -229,10 +252,10 @@ impl<TD: TableDefinition, T, O: OutputFormat, R: ReturnValue>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, Condition};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let user = sample_user();
     /// // Put only if the item does not exist OR its TTL has expired
-    /// user.put(client)
+    /// user.put()
     ///     .condition(User::not_exists() | Condition::lt("expiration_timestamp", 1_700_000_000))
     ///     .await?;
     /// # Ok(())
@@ -262,9 +285,10 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD>, O: OutputFormat, R: ReturnValue>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// // Overwrite only if the item already exists
-    /// sample_user().put(client).exists().await?;
+    /// let user = sample_user();
+    /// user.put().exists().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -282,9 +306,10 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD>, O: OutputFormat, R: ReturnValue>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// // Create-only: fails if user already exists
-    /// sample_user().put(client).not_exists().await?;
+    /// let new_user = sample_user();
+    /// new_user.put().not_exists().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -308,9 +333,10 @@ impl<TD: TableDefinition, T, R: ReturnValue, C: ConditionState> PutItemRequest<T
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let old_raw = sample_user()
-    ///     .put(client)
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let user = sample_user();
+    /// let old_raw = user
+    ///     .put()
     ///     .return_old()
     ///     .raw()
     ///     .await?;
@@ -347,8 +373,9 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// sample_user().put(client).not_exists().execute().await?;
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let new_user = sample_user();
+    /// new_user.put().not_exists().execute().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -395,8 +422,9 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD> + DeserializeOwned, C: ConditionSt
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let old /* : Option<User> */ = sample_user().put(client).return_old().execute().await?;
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let user = sample_user();
+    /// let old /* : Option<User> */ = user.put().return_old().execute().await?;
     /// // old is None on first put, Some(previous_user) on subsequent puts
     /// # Ok(())
     /// # }
@@ -448,9 +476,10 @@ impl<TD: TableDefinition, T, C: ConditionState> PutItemRequest<TD, T, Raw, Retur
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let old_raw = sample_user()
-    ///     .put(client)
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let user = sample_user();
+    /// let old_raw = user
+    ///     .put()
     ///     .return_old()
     ///     .raw()
     ///     .execute()

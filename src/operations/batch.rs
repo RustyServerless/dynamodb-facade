@@ -4,7 +4,6 @@ use aws_sdk_dynamodb::types::{
     WriteRequest,
     builders::{DeleteRequestBuilder, PutRequestBuilder},
 };
-use tracing::Instrument;
 
 /// Entry points for building DynamoDB `BatchWriteItem` write requests.
 ///
@@ -23,12 +22,11 @@ use tracing::Instrument;
 /// use dynamodb_facade::{DynamoDBItemBatchOp, dynamodb_batch_write, KeyId};
 ///
 /// # async fn example(
-/// #     client: aws_sdk_dynamodb::Client,
 /// #     enrollments: Vec<Enrollment>,
 /// # ) -> dynamodb_facade::Result<()> {
 /// // Batch put a collection of enrollments
 /// let requests: Vec<_> = enrollments.iter().map(|e| e.batch_put()).collect();
-/// dynamodb_batch_write::<PlatformTable>(client, requests).await?;
+/// dynamodb_batch_write::<PlatformTable>(requests).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -53,12 +51,11 @@ pub trait DynamoDBItemBatchOp<TD: TableDefinition>: DynamoDBItemOp<TD> {
     /// use dynamodb_facade::{DynamoDBItemBatchOp, dynamodb_batch_write};
     ///
     /// # async fn example(
-    /// #     client: aws_sdk_dynamodb::Client,
     /// #     enrollments: Vec<Enrollment>,
     /// # ) -> dynamodb_facade::Result<()> {
     /// // enrollments: Vec<Enrollment>
     /// let requests: Vec<_> = enrollments.iter().map(|e| e.batch_put()).collect();
-    /// dynamodb_batch_write::<PlatformTable>(client, requests).await?;
+    /// dynamodb_batch_write::<PlatformTable>(requests).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -82,12 +79,11 @@ pub trait DynamoDBItemBatchOp<TD: TableDefinition>: DynamoDBItemOp<TD> {
     /// use dynamodb_facade::{DynamoDBItemBatchOp, dynamodb_batch_write};
     ///
     /// # async fn example(
-    /// #     client: aws_sdk_dynamodb::Client,
     /// #     enrollments: Vec<Enrollment>,
     /// # ) -> dynamodb_facade::Result<()> {
     /// // enrollments: Vec<Enrollment>
     /// let requests: Vec<_> = enrollments.iter().map(|e| e.batch_delete()).collect();
-    /// dynamodb_batch_write::<PlatformTable>(client, requests).await?;
+    /// dynamodb_batch_write::<PlatformTable>(requests).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -108,7 +104,6 @@ pub trait DynamoDBItemBatchOp<TD: TableDefinition>: DynamoDBItemOp<TD> {
     /// use dynamodb_facade::{DynamoDBItemBatchOp, dynamodb_batch_write, KeyId};
     ///
     /// # async fn example(
-    /// #     client: aws_sdk_dynamodb::Client,
     /// #     user_ids: Vec<String>,
     /// # ) -> dynamodb_facade::Result<()> {
     /// // user_ids: Vec<String>
@@ -116,7 +111,7 @@ pub trait DynamoDBItemBatchOp<TD: TableDefinition>: DynamoDBItemOp<TD> {
     ///     .iter()
     ///     .map(|id| User::batch_delete_by_id(KeyId::pk(id)))
     ///     .collect();
-    /// dynamodb_batch_write::<PlatformTable>(client, requests).await?;
+    /// dynamodb_batch_write::<PlatformTable>(requests).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -137,12 +132,10 @@ impl<TD: TableDefinition, DBI: DynamoDBItemOp<TD>> DynamoDBItemBatchOp<TD> for D
 /// # use dynamodb_facade::test_fixtures::*;
 /// use dynamodb_facade::{batch_put, dynamodb_batch_write};
 ///
-/// # async fn example(
-/// #     client: aws_sdk_dynamodb::Client,
-/// # ) -> dynamodb_facade::Result<()> {
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// let item /* : Item<PlatformTable> */ = sample_user_item();
 /// let request = batch_put(item);
-/// dynamodb_batch_write::<PlatformTable>(client, vec![request]).await?;
+/// dynamodb_batch_write::<PlatformTable>(vec![request]).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -169,12 +162,10 @@ pub fn batch_put(item: Item<impl TableDefinition>) -> WriteRequest {
 /// # use dynamodb_facade::test_fixtures::*;
 /// use dynamodb_facade::{batch_delete, dynamodb_batch_write};
 ///
-/// # async fn example(
-/// #     client: aws_sdk_dynamodb::Client,
-/// # ) -> dynamodb_facade::Result<()> {
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// let key = sample_user_item().into_key_only();
 /// let request = batch_delete(key);
-/// dynamodb_batch_write::<PlatformTable>(client, vec![request]).await?;
+/// dynamodb_batch_write::<PlatformTable>(vec![request]).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -190,7 +181,7 @@ pub fn batch_delete(key: Key<impl TableDefinition>) -> WriteRequest {
         .build()
 }
 
-/// Executes a batch of `WriteRequest`s against a DynamoDB table.
+/// Executes a batch of `WriteRequest`s against a DynamoDB table using the [`global_client`].
 ///
 /// Handles all the complexity of the DynamoDB batch write API:
 ///
@@ -220,71 +211,16 @@ pub fn batch_delete(key: Key<impl TableDefinition>) -> WriteRequest {
 /// use dynamodb_facade::{DynamoDBItemBatchOp, dynamodb_batch_write};
 ///
 /// # async fn example(
-/// #     client: aws_sdk_dynamodb::Client,
 /// #     enrollments: Vec<Enrollment>,
 /// # ) -> dynamodb_facade::Result<()> {
 /// // Batch put a large collection — chunking and retries are handled automatically
 /// let requests: Vec<_> = enrollments.iter().map(|e| e.batch_put()).collect();
-/// dynamodb_batch_write::<PlatformTable>(client, requests).await?;
+/// dynamodb_batch_write::<PlatformTable>(requests).await?;
 /// # Ok(())
 /// # }
 /// ```
-#[tracing::instrument(level = "debug", skip(client))]
-pub async fn dynamodb_batch_write<TD: TableDefinition>(
-    client: aws_sdk_dynamodb::Client,
-    mut batch_write_requests: Vec<WriteRequest>,
-) -> Result<()> {
-    const MAX_RETRY: usize = 3;
-
-    let table_name = TD::table_name();
-    // Process the Batch(es) in massively parallel fashion
-    // Because Rust.
-    tracing::debug!("putting {} items...", batch_write_requests.len());
-    let mut retry = 0;
-    while !batch_write_requests.is_empty() && retry < MAX_RETRY {
-        retry += 1;
-        tracing::debug!("Try #{retry}/{MAX_RETRY}");
-        let handles = batch_write_requests
-            .chunks(25)
-            .enumerate()
-            .map(|(index, chunk)| {
-                let chunk = chunk.to_vec();
-                let cclient = client.clone();
-                let ctable_name = table_name.clone();
-                tokio::spawn(
-                    async move {
-                        tracing::debug!("Sending BatchWriteItem for chunk #{index}...");
-                        let result = cclient
-                            .batch_write_item()
-                            .set_request_items(Some([(ctable_name, chunk)].into()))
-                            .send()
-                            .await;
-                        tracing::debug!("BatchWriteItem finished for chunk #{index}");
-                        result
-                    }
-                    .instrument(tracing::info_span!("batch_write_chunk", %index, try=retry)),
-                )
-            })
-            .collect::<Vec<_>>();
-        let mut unprocess_vec = Vec::default();
-
-        for h in handles {
-            let batch_output = h.await.expect("batch write task panicked")?;
-            if let Some(unproccessed) = batch_output.unprocessed_items {
-                if !unproccessed.is_empty() {
-                    unprocess_vec.extend(unproccessed.into_iter().flat_map(|e| e.1));
-                }
-            }
-        }
-
-        batch_write_requests = unprocess_vec;
-
-        tracing::debug!("{} items were unprocessed", batch_write_requests.len());
-    }
-
-    if batch_write_requests.is_empty() {
-        Ok(())
-    } else {
-        Err(crate::Error::FailedBatchWrite(batch_write_requests))
-    }
+pub fn dynamodb_batch_write<TD: TableDefinition>(
+    batch_write_requests: Vec<WriteRequest>,
+) -> impl Future<Output = Result<()>> {
+    explicit_client::dynamodb_batch_write::<TD>(global_client(), batch_write_requests)
 }

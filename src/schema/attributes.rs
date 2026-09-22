@@ -235,8 +235,7 @@ pub trait HasAttribute<A: AttributeDefinition> {
     fn attribute_id(&self) -> Self::Id<'_>;
     /// Converts an attribute ID into a Rust value of type [`Self::Value`](HasAttribute::Value)
     /// which can then be converted into the correct [`AttributeValue`](crate::AttributeValue)
-    /// at serialization using the via
-    /// [`IntoTypedAttributeValue`].
+    /// at serialization via [`IntoTypedAttributeValue`].
     fn attribute_value(id: Self::Id<'_>) -> Self::Value;
     /// Convenience method: calls [`attribute_id`](HasAttribute::attribute_id)
     /// then [`attribute_value`](HasAttribute::attribute_value), returning a

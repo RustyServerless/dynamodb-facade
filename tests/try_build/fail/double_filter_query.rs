@@ -10,8 +10,8 @@
 
 use dynamodb_facade::test_fixtures::*;
 use dynamodb_facade::{Condition, DynamoDBItemOp};
-fn test(client: dynamodb_facade::Client) {
-    let _ = User::query(client, User::key_condition("user-1"))
+fn test() {
+    let _ = User::query(User::key_condition("user-1"))
         .filter(Condition::eq("role", "student"))
         .filter(Condition::eq("role", "instructor")); // <-- compile error here
 }

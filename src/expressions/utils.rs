@@ -602,8 +602,9 @@ fn is_reserved_word(word: &str) -> bool {
 
 /// Returns `true` if `word` must be replaced with a `#name` placeholder in an expression.
 ///
-/// A word must be aliased if it starts with a non-alpha character, contains `#` or `:`,
-/// or is a DynamoDB reserved word.
+/// A word must be aliased if it starts with a non-alpha character, has a
+/// non-alphanumeric second character, contains `#` or `:`, or is a DynamoDB
+/// reserved word.
 fn must_be_aliased(word: &str) -> bool {
     if word.is_empty() {
         return false;
@@ -616,7 +617,7 @@ fn must_be_aliased(word: &str) -> bool {
     if second_char.is_none() {
         return false;
     }
-    if second_char.is_some_and(|c| !c.is_ascii_alphanumeric()) {
+    if !second_char.unwrap().is_ascii_alphanumeric() {
         return true;
     }
 

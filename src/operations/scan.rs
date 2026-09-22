@@ -1,12 +1,17 @@
 use super::*;
 
 use aws_sdk_dynamodb::operation::scan::builders::ScanFluentBuilder;
+use futures_core::Stream;
+use futures_util::StreamExt;
 
 /// Builder for a DynamoDB `Scan` request.
 ///
 /// Constructed via [`DynamoDBItemOp::scan`] / [`DynamoDBItemOp::scan_index`]
 /// (typed, with a concrete `T`) or [`ScanRequest::new`] /
-/// [`ScanRequest::new_index`] (stand-alone, raw output). The builder provides:
+/// [`ScanRequest::index_new`] / [`ScanRequest::with_client`] /
+/// [`ScanRequest::index_with_client`] (stand-alone, raw output).
+///
+/// The builder provides:
 ///
 /// - **Output format** — the result can be deserialized into `T`.
 ///   Call [`.raw()`][ScanRequest::raw] to receive untyped [`Item<TD>`]
@@ -36,14 +41,12 @@ use aws_sdk_dynamodb::operation::scan::builders::ScanFluentBuilder;
 /// # use dynamodb_facade::test_fixtures::*;
 /// use dynamodb_facade::{DynamoDBItemOp, Condition};
 ///
-/// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-/// # let client = cclient.clone();
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// // Simple scan
-/// let all_users /* : Vec<User> */ = User::scan(client).all().await?;
+/// let all_users /* : Vec<User> */ = User::scan().all().await?;
 ///
-/// # let client = cclient.clone();
 /// // Scan with a filter
-/// let instructors /* : Vec<User> */ = User::scan(client)
+/// let instructors /* : Vec<User> */ = User::scan()
 ///     .filter(Condition::eq("role", "instructor"))
 ///     .all()
 ///     .await?;
@@ -64,8 +67,10 @@ pub struct ScanRequest<
 
 // -- Stand-alone constructors (T = (), O = Raw)
 
+#[allow(clippy::new_without_default)]
 impl<TD: TableDefinition> ScanRequest<TD> {
-    /// Creates a stand-alone `ScanRequest` against the full table with raw output.
+    /// Creates a stand-alone `ScanRequest` against the full table with raw output using
+    /// the globally defined [`aws_sdk_dynamodb::Client`].
     ///
     /// Output is raw (`T = ()`, `O = Raw`). For typed access, prefer
     /// [`DynamoDBItemOp::scan`] instead.
@@ -76,16 +81,38 @@ impl<TD: TableDefinition> ScanRequest<TD> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::ScanRequest;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let items = ScanRequest::<PlatformTable>::new(client).all().await?;
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let items = ScanRequest::<PlatformTable>::new().all().await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(client: aws_sdk_dynamodb::Client) -> Self {
+    pub fn new() -> Self {
+        Self::_new(global_client())
+    }
+
+    /// Creates a stand-alone `ScanRequest` against the full table with raw output using
+    /// the provided [`aws_sdk_dynamodb::Client`].
+    ///
+    /// Output is raw (`T = ()`, `O = Raw`). For typed access, prefer
+    /// [`explicit_client::DynamoDBItemOp::scan`] instead.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use dynamodb_facade::test_fixtures::*;
+    /// use dynamodb_facade::ScanRequest;
+    ///
+    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// let items = ScanRequest::<PlatformTable>::with_client(client).all().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_client(client: aws_sdk_dynamodb::Client) -> Self {
         Self::_new(client)
     }
 
-    /// Creates a stand-alone `ScanRequest` scoped to a secondary index.
+    /// Creates a stand-alone `ScanRequest` scoped to a secondary index using
+    /// the globally defined [`aws_sdk_dynamodb::Client`].
     ///
     /// Output is raw (`T = ()`, `O = Raw`). For typed access, prefer
     /// [`DynamoDBItemOp::scan_index`] instead.
@@ -96,15 +123,38 @@ impl<TD: TableDefinition> ScanRequest<TD> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::ScanRequest;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let items = ScanRequest::<PlatformTable>::new_index::<TypeIndex>(client)
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let items = ScanRequest::<PlatformTable>::index_new::<TypeIndex>()
     ///     .all()
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new_index<I: IndexDefinition<TD>>(client: aws_sdk_dynamodb::Client) -> Self {
-        Self::_new_index::<I>(client)
+    pub fn index_new<I: IndexDefinition<TD>>() -> Self {
+        Self::_index_new::<I>(global_client())
+    }
+
+    /// Creates a stand-alone `ScanRequest` scoped to a secondary index using
+    /// the provided [`aws_sdk_dynamodb::Client`].
+    ///
+    /// Output is raw (`T = ()`, `O = Raw`). For typed access, prefer
+    /// [`explicit_client::DynamoDBItemOp::scan_index`] instead.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use dynamodb_facade::test_fixtures::*;
+    /// use dynamodb_facade::ScanRequest;
+    ///
+    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// let items = ScanRequest::<PlatformTable>::index_with_client::<TypeIndex>(client)
+    ///     .all()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn index_with_client<I: IndexDefinition<TD>>(client: aws_sdk_dynamodb::Client) -> Self {
+        Self::_index_new::<I>(client)
     }
 }
 
@@ -122,7 +172,7 @@ impl<TD: TableDefinition, T, O: OutputFormat, F: FilterState, P: ProjectionState
         }
     }
 
-    pub(super) fn _new_index<I: IndexDefinition<TD>>(client: aws_sdk_dynamodb::Client) -> Self {
+    pub(super) fn _index_new<I: IndexDefinition<TD>>(client: aws_sdk_dynamodb::Client) -> Self {
         let table_name = TD::table_name();
         let index_name = I::index_name();
         tracing::debug!(table_name, index_name, "Scan (index)");
@@ -144,8 +194,8 @@ impl<TD: TableDefinition, T, O: OutputFormat, F: FilterState, P: ProjectionState
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let users /* : Vec<User> */ = User::scan(client).consistent_read().all().await?;
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let users /* : Vec<User> */ = User::scan().consistent_read().all().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -169,8 +219,8 @@ impl<TD: TableDefinition, T, O: OutputFormat, F: FilterState, P: ProjectionState
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let users /* : Vec<User> */ = User::scan(client).limit(100).all().await?;
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let users /* : Vec<User> */ = User::scan().limit(100).all().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -191,8 +241,8 @@ impl<TD: TableDefinition, T, O: OutputFormat, F: FilterState, P: ProjectionState
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let sdk_builder = User::scan(client).into_inner();
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let sdk_builder = User::scan().into_inner();
     /// // configure sdk_builder further, then call .send().await
     /// # Ok(())
     /// # }
@@ -220,8 +270,8 @@ impl<TD: TableDefinition, T, O: OutputFormat, P: ProjectionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, Condition};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let instructors /* : Vec<User> */ = User::scan(client)
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let instructors /* : Vec<User> */ = User::scan()
     ///     .filter(Condition::eq("role", "instructor"))
     ///     .all()
     ///     .await?;
@@ -255,9 +305,9 @@ impl<TD: TableDefinition, T, O: OutputFormat, F: FilterState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, Projection};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// // Fetch only the "name" attribute for each user
-    /// let partial = User::scan(client)
+    /// let partial = User::scan()
     ///     .project(Projection::new(["name"]))
     ///     .all()
     ///     .await?;
@@ -295,8 +345,8 @@ impl<TD: TableDefinition, T, F: FilterState, P: ProjectionState> ScanRequest<TD,
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let raw_items = User::scan(client).raw().all().await?;
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let raw_items = User::scan().raw().all().await?;
     /// // raw_items: Vec<Item<PlatformTable>>
     /// # Ok(())
     /// # }
@@ -336,8 +386,8 @@ impl<
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let all_users /* : Vec<User> */ = User::scan(client).all().await?;
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let all_users /* : Vec<User> */ = User::scan().all().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -365,8 +415,8 @@ impl<
     /// use futures_util::StreamExt;
     /// use std::pin::pin;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let stream = User::scan(client).stream();
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let stream = User::scan().stream();
     /// // Must pin the stream
     /// let mut stream = pin!(stream);
     ///
@@ -404,8 +454,8 @@ impl<TD: TableDefinition, T, F: FilterState, P: ProjectionState> ScanRequest<TD,
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::ScanRequest;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let items = ScanRequest::<PlatformTable>::new(client).all().await?;
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let items = ScanRequest::<PlatformTable>::new().all().await?;
     /// // items: Vec<Item<PlatformTable>>
     /// # Ok(())
     /// # }
@@ -428,8 +478,8 @@ impl<TD: TableDefinition, T, F: FilterState, P: ProjectionState> ScanRequest<TD,
     /// use futures_util::StreamExt;
     /// use std::pin::pin;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let stream = ScanRequest::<PlatformTable>::new(client).stream();
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let stream = ScanRequest::<PlatformTable>::new().stream();
     /// // Must pin the stream
     /// let mut stream = pin!(stream);
     ///

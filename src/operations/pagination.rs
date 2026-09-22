@@ -6,8 +6,8 @@ use async_stream::try_stream;
 use aws_sdk_dynamodb::operation::{
     query::builders::QueryFluentBuilder, scan::builders::ScanFluentBuilder,
 };
-pub(super) use futures_core::Stream;
-pub(super) use futures_util::StreamExt;
+use futures_core::Stream;
+use futures_util::StreamExt;
 
 /// Executes a DynamoDB `Scan` request, collecting all pages into a `Vec`.
 ///

@@ -30,8 +30,8 @@
 use std::sync::OnceLock;
 
 use dynamodb_facade::{
-    Condition, DynamoDBError, DynamoDBItemOp, Item, KeyId, Projection, Result, Update,
-    attribute_definitions, dynamodb_item, table_definitions,
+    Condition, DynamoDBError, Item, KeyId, Projection, Result, Update, attribute_definitions,
+    dynamodb_item, explicit_client::DynamoDBItemOp, table_definitions,
 };
 use serde::{Deserialize, Serialize};
 

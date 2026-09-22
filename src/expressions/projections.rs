@@ -68,8 +68,9 @@ where
     /// Creates a projection from an iterator of attribute names.
     ///
     /// The table's key attributes (PK, and SK for composite-key tables) are
-    /// **always** prepended to the provided list, ensuring the resulting
-    /// [`Item<TD>`](crate::Item) is always valid for the table schema.
+    /// **always** included in the projection, whether or not they are part of
+    /// the provided list, ensuring the resulting [`Item<TD>`](crate::Item) is
+    /// always valid for the table schema.
     ///
     /// Duplicate attribute names are deduplicated automatically.
     ///

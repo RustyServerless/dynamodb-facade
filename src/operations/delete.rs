@@ -8,8 +8,10 @@ use aws_sdk_dynamodb::operation::delete_item::builders::DeleteItemFluentBuilder;
 /// Builder for a DynamoDB `DeleteItem` request.
 ///
 /// Constructed via [`DynamoDBItemOp::delete`] / [`DynamoDBItemOp::delete_by_id`]
-/// (typed, with a concrete `T`) or [`DeleteItemRequest::new`] (stand-alone,
-/// raw output). The builder provides:
+/// (typed, with a concrete `T`) or [`DeleteItemRequest::new`] / [`DeleteItemRequest::with_client`]
+/// (stand-alone, raw output).
+///
+/// The builder provides:
 ///
 /// - **Output format** — the result can be deserialized into `T`.
 ///   Call [`.raw()`][DeleteItemRequest::raw] to receive an untyped [`Item<TD>`]
@@ -22,13 +24,13 @@ use aws_sdk_dynamodb::operation::delete_item::builders::DeleteItemFluentBuilder;
 ///   [`.exists()`][DeleteItemRequest::exists].
 ///
 /// The builder implements [`IntoFuture`], so it can
-/// be `.await`ed directly.
+/// be `.await`ed directly without calling `.execute()` explicitly.
 ///
 /// # Errors
 ///
 /// Returns [`Err`] if the DynamoDB request fails or if a condition
-/// expression is set and the check fails
-/// (`ConditionalCheckFailedException`).
+/// expression is set and the check fails (`ConditionalCheckFailedException`),
+/// or if deserialization of the returned attributes fails.
 ///
 /// # Examples
 ///
@@ -36,32 +38,26 @@ use aws_sdk_dynamodb::operation::delete_item::builders::DeleteItemFluentBuilder;
 /// # use dynamodb_facade::test_fixtures::*;
 /// use dynamodb_facade::{DynamoDBItemOp, Condition, KeyId};
 ///
-/// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// let enrollment = sample_enrollment();
 ///
-/// # let client = cclient.clone();
 /// // Simple delete
-/// enrollment.delete(client).await?;
+/// enrollment.delete().await?;
 ///
-/// # let client = cclient.clone();
 /// // Delete only if the item exists
-/// enrollment.delete(client).exists().await?;
+/// enrollment.delete().exists().await?;
 ///
-/// # let client = cclient.clone();
 /// // Delete with a custom condition
 /// enrollment
-///     .delete(client)
+///     .delete()
 ///     .condition(Enrollment::exists() & Condition::not_exists("completed_at"))
 ///     .await?;
 ///
-/// # let client = cclient.clone();
 /// // Delete and return the old item
-/// let old /* : Option<Enrollment> */ = enrollment.delete(client).return_old().await?;
+/// let old /* : Option<Enrollment> */ = enrollment.delete().return_old().await?;
 ///
-/// # let client = cclient.clone();
 /// // Delete by ID and return the old item
 /// let old /* : Option<Enrollment> */ = Enrollment::delete_by_id(
-///     client,
 ///     KeyId::pk("user-1").sk("course-42"),
 /// )
 /// .await?;
@@ -97,8 +93,9 @@ impl<TD: TableDefinition, T, O: OutputFormat, R: ReturnValue, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let sdk_builder = sample_enrollment().delete(client).into_inner();
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let enrollment = sample_enrollment();
+    /// let sdk_builder = enrollment.delete().into_inner();
     /// // configure sdk_builder further, then call .send().await
     /// # Ok(())
     /// # }
@@ -111,7 +108,8 @@ impl<TD: TableDefinition, T, O: OutputFormat, R: ReturnValue, C: ConditionState>
 // -- Stand-alone constructor (ReturnNothing, NoCondition, T = (), O = Raw)
 
 impl<TD: TableDefinition> DeleteItemRequest<TD> {
-    /// Creates a stand-alone `DeleteItemRequest` with raw output (`T = ()`, `O = Raw`).
+    /// Creates a stand-alone `DeleteItemRequest` with raw output (`T = ()`, `O = Raw`) using
+    /// the globally defined [`aws_sdk_dynamodb::Client`].
     ///
     /// Use this when you already have a [`Key<TD>`] and do not need typed
     /// deserialization of the deleted value. For typed access, prefer
@@ -123,13 +121,36 @@ impl<TD: TableDefinition> DeleteItemRequest<TD> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DeleteItemRequest;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let key = sample_user_item().into_key_only();
-    /// DeleteItemRequest::<PlatformTable>::new(client, key).await?;
+    /// DeleteItemRequest::<PlatformTable>::new(key).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(client: aws_sdk_dynamodb::Client, key: Key<TD>) -> Self {
+    pub fn new(key: Key<TD>) -> Self {
+        Self::_new(global_client(), key)
+    }
+
+    /// Creates a stand-alone `DeleteItemRequest` with raw output (`T = ()`, `O = Raw`) using
+    /// the provided [`aws_sdk_dynamodb::Client`].
+    ///
+    /// Use this when you already have a [`Key<TD>`] and do not need typed
+    /// deserialization of the deleted value. For typed access, prefer
+    /// [`explicit_client::DynamoDBItemOp::delete`] or [`explicit_client::DynamoDBItemOp::delete_by_id`] instead.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use dynamodb_facade::test_fixtures::*;
+    /// use dynamodb_facade::DeleteItemRequest;
+    ///
+    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// let key = sample_user_item().into_key_only();
+    /// DeleteItemRequest::<PlatformTable>::with_client(client, key).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_client(client: aws_sdk_dynamodb::Client, key: Key<TD>) -> Self {
         Self::_new(client, key)
     }
 }
@@ -172,9 +193,10 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let old /* : Option<Enrollment> */ = sample_enrollment()
-    ///     .delete(client)
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let enrollment = sample_enrollment();
+    /// let old /* : Option<Enrollment> */ = enrollment
+    ///     .delete()
     ///     .return_old()
     ///     .await?;
     /// # Ok(())
@@ -203,9 +225,9 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// // delete_by_id defaults to Return<Old>; opt out with return_none
-    /// Enrollment::delete_by_id(client, KeyId::pk("user-1").sk("course-42"))
+    /// Enrollment::delete_by_id(KeyId::pk("user-1").sk("course-42"))
     ///     .return_none()
     ///     .await?;
     /// # Ok(())
@@ -240,10 +262,11 @@ impl<TD: TableDefinition, T, O: OutputFormat, R: ReturnValue>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, Condition};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// // Delete only if the enrollment has not been completed
-    /// sample_enrollment()
-    ///     .delete(client)
+    /// let enrollment = sample_enrollment();
+    /// enrollment
+    ///     .delete()
     ///     .condition(Enrollment::exists() & Condition::not_exists("completed_at"))
     ///     .await?;
     /// # Ok(())
@@ -274,8 +297,9 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD>, O: OutputFormat, R: ReturnValue>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// sample_enrollment().delete(client).exists().await?;
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let enrollment = sample_enrollment();
+    /// enrollment.delete().exists().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -301,10 +325,11 @@ impl<TD: TableDefinition, T, R: ReturnValue, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let enrollment = sample_enrollment();
     /// let old_raw /* : Option<Item<PlatformTable>> */ =
-    ///     sample_enrollment()
-    ///         .delete(client)
+    ///     enrollment
+    ///         .delete()
     ///         .return_old()
     ///         .raw()
     ///         .await?;
@@ -340,8 +365,9 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// sample_enrollment().delete(client).exists().execute().await?;
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let enrollment = sample_enrollment();
+    /// enrollment.delete().exists().execute().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -388,9 +414,8 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD> + DeserializeOwned, C: ConditionSt
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let old /* : Option<Enrollment> */ = Enrollment::delete_by_id(
-    ///     client,
     ///     KeyId::pk("user-1").sk("course-42"),
     /// )
     /// .execute()
@@ -445,9 +470,10 @@ impl<TD: TableDefinition, T, C: ConditionState> DeleteItemRequest<TD, T, Raw, Re
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let old_raw = sample_enrollment()
-    ///     .delete(client)
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let enrollment = sample_enrollment();
+    /// let old_raw = enrollment
+    ///     .delete()
     ///     .return_old()
     ///     .raw()
     ///     .execute()

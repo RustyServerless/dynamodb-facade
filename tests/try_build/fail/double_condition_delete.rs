@@ -11,9 +11,9 @@
 use dynamodb_facade::test_fixtures::*;
 use dynamodb_facade::{Condition, DynamoDBItemOp};
 
-fn test(client: dynamodb_facade::Client) {
+fn test() {
     let _ = sample_user()
-        .delete(client)
+        .delete()
         .condition(Condition::eq("role", "student"))
         .condition(Condition::eq("role", "instructor")); // <-- compile error here
 }

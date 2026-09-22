@@ -6,10 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Breaking**: `IntoAttributeValue` and `IntoStringAttributeValue` implementations for `Rc<str>`, `Arc<str>` and `Box<str>`.
+- The `global` module with the `init_global_client` and `global_client` functions allowing to define and use a globally defined and accessible `aws_sdk_dynamodb::Client`
+- A new version of the `DynamoDBItemOp` trait with I/O operations that no longer take the `client` parameter but instead rely on the `global_client`.
+- A new version of the `dynamodb_batch_write` function that no longer takes the `client` parameter but instead relies on the `global_client`.
+- The old behavior still exists and has been put in a new `explicit_client` public module.
+
 ### Changed
 
 - Bumped MSRV to 1.88 and re-fixing try_build tests outputs
 - Renamed the `integration` feature to `dyndb-local-integration` to clarify its purpose
+- **Breaking**: `DynamoDBItemOp` methods no longer take the `client` parameter but instead rely on the `global_client`. Use `dynamodb_facade::explicit_client::DynamoDBItemOp` instead of `dynamodb_facade::DynamoDBItemOp` to keep the old behavior.
+- **Breaking**: `dynamodb_batch_write` no longer takes the `client` parameter but instead relies on the `global_client`. Use `dynamodb_facade::explicit_client::dynamodb_batch_write` instead of `dynamodb_facade::dynamodb_batch_write` to keep the old behavior.
+- **Breaking**: Renamed the `QueryRequest` and `ScanRequest` index constructors from `new_index` to `index_new`.
+- **Breaking**: All the operations `*Request` (`GetRequest`, `PutRequest`, `QueryRequest`, ...) builders `new()` constructors are no longer expecting a `client` parameter. The new `with_client` constructor has been added with the old `new` signature.
 
 ## [0.1.1] - 2026-04-27
 

@@ -18,7 +18,7 @@ mod sealed_traits {
 /// | Rust type | `KA` parameter |
 /// |---|---|
 /// | [`String`], [`&str`], `&String` | [`StringAttribute`] |
-/// | Integer and float primitives, [`String`], [`&str`] | [`NumberAttribute`] |
+/// | Integer and float primitives, [`AsNumber<T>`] | [`NumberAttribute`] |
 /// | [`Vec<u8>`], [`&[u8]`] | [`BinaryAttribute`] |
 ///
 /// `IntoTypedAttributeValue<KA>` is used as the bound on

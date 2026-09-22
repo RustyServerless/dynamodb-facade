@@ -1,7 +1,7 @@
 error[E0599]: `ScanRequest<PlatformTable, dynamodb_facade::test_fixtures::User, Typed, AlreadyHasFilter>` is not an iterator
   --> tests/try_build/fail/double_filter_scan.rs:16:10
    |
-14 |       let _ = User::scan(client)
+14 |       let _ = User::scan()
    |  _____________-
 15 | |         .filter(Condition::eq("role", "student"))
 16 | |         .filter(Condition::eq("role", "instructor")); // <-- compile error here

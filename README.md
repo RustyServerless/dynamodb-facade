@@ -52,7 +52,6 @@ Same operation with `dynamodb-facade`:
 
 ```rust
 User::update_by_id(
-    client,
     KeyId::pk(user_id),
     Update::set("name", new_name),
 )
@@ -60,6 +59,7 @@ User::update_by_id(
 .await?;
 // Returns the updated `User`. Placeholders, key map,
 // return-value plumbing, and deserialisation are all handled.
+// The client is the process-global one installed at startup.
 ```
 
 The same compression applies across every operation. A 50-line raw batch-write loop with manual 25-item chunking, parallel dispatch, and `UnprocessedItems` retry becomes a single call to `dynamodb_batch_write`. Hand-rolled `ExclusiveStartKey` pagination becomes `.all()` or `.stream()`.
@@ -73,6 +73,7 @@ The same compression applies across every operation. A 50-line raw batch-write l
     <li><a href="#getting-started">Getting Started</a></li>
     <li><a href="#quick-start">Quick Start</a></li>
     <li><a href="#more-examples">More Examples</a></li>
+    <li><a href="#using-an-explicit-client">Using an Explicit Client</a></li>
     <li><a href="#faq">FAQ</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#minimum-supported-rust-version">MSRV</a></li>
@@ -95,6 +96,7 @@ The same compression applies across every operation. A 50-line raw batch-write l
 - **Automatic batch chunking + retry.** `dynamodb_batch_write` splits into 25-item batches, runs them in parallel, and retries `UnprocessedItems` with backoff (up to 5 attempts).
 - **Typed transactions.** `transact_put`, `transact_delete`, `transact_update`, `transact_condition` plug straight into the SDK's `transact_write_items()` builder; each `TransactWriteItem` is built with the same condition DSL as a stand-alone operation.
 - **Escape hatch preserved.** Every builder exposes `.into_inner()` returning the underlying SDK fluent builder, so nothing the raw SDK can do is locked out.
+- **Client-less by default.** Operations run against a process-global client installed once at startup with `init_global_client`, so `user.put()` and `User::get(...)` never carry a client argument. An [explicit-client trait](#using-an-explicit-client) is available when a single global client does not fit.
 - **Flexible serialisation.** Items round-trip through `serde_dynamo` by default; `DynamoDBItem` can be hand-implemented when serde is not a good fit.
 
 ---
@@ -124,12 +126,12 @@ dynamodb-facade = "0.1"
 
 ## Quick Start
 
-Declare the attributes, the table, wire up a struct, perform operations.
+Declare the attributes, the table, wire up a struct, install the global client, then perform operations.
 
 ```rust
 use dynamodb_facade::{
     attribute_definitions, table_definitions, dynamodb_item,
-    Condition, Update, KeyId, DynamoDBItemOp, StringAttribute,
+    init_global_client, Update, KeyId, DynamoDBItemOp, StringAttribute,
 };
 use serde::{Deserialize, Serialize};
 
@@ -173,43 +175,120 @@ dynamodb_item! {
     }
 }
 
-// 4. CRUD — no boilerplate.
-# async fn example(client: dynamodb_facade::Client) -> dynamodb_facade::Result<()> {
-let user = User {
-    id: "u-1".to_owned(),
-    name: "Alice".to_owned(),
-    email: "alice@example.com".to_owned(),
-};
+// 4. Install the process-global client once, early in `main`.
+#[tokio::main]
+async fn main() -> dynamodb_facade::Result<()> {
+    let config = aws_config::load_from_env().await;
+    let client = aws_sdk_dynamodb::Client::new(&config);
+    init_global_client(client);
 
-// Create or overwrite:
-user.put(client.clone()).await?;
+    examples().await
+}
 
-// Create-only (fails if the item already exists):
-user.put(client.clone()).not_exists().await?;
+// 5. CRUD — no client argument, no boilerplate.
+async fn examples() -> dynamodb_facade::Result<()> {
+    let user = User {
+        id: "u-1".to_owned(),
+        name: "Alice".to_owned(),
+        email: "alice@example.com".to_owned(),
+    };
 
-// Get by id:
-let loaded /* : Option<User> */ = User::get(client.clone(), KeyId::pk("u-1")).await?;
+    // Create or overwrite:
+    user.put().await?;
 
-// Conditional update, returning the new item:
-let updated /* : User */ = User::update_by_id(
-    client.clone(),
-    KeyId::pk("u-1"),
-    Update::set("name", "Alicia"),
-)
-.exists()
-.await?;
+    // Create-only (fails if the item already exists):
+    user.put().not_exists().await?;
 
-// Delete by id, returning the old item:
-let deleted /* : Option<User> */ = User::delete_by_id(client, KeyId::pk("u-1")).await?;
-# Ok(())
-# }
+    // Get by id:
+    let loaded /* : Option<User> */ = User::get(KeyId::pk("u-1")).await?;
+
+    // Conditional update, returning the new item:
+    let updated /* : User */ = User::update_by_id(
+        KeyId::pk("u-1"),
+        Update::set("name", "Alicia"),
+    )
+    .exists()
+    .await?;
+
+    // Delete by id, returning the old item:
+    let deleted /* : Option<User> */ = User::delete_by_id(KeyId::pk("u-1")).await?;
+    Ok(())
+}
 ```
+
+> The client-less entry points panic if `init_global_client` has not run yet.
+> Call it exactly once, before any operation, early in program startup.
 
 ---
 
 ## More Examples
 
 The following are small, representative slices. For a full tour across a single-table domain (users, courses, enrollments, configs), see [`EXAMPLES.md`](EXAMPLES.md) — 13 sections covering schema design, every CRUD variant, queries on indexes, scans with dispatch, the full condition and update DSL, batch writes, and transactions.
+
+### Index declaration and usage
+
+Indexes are declared as zero-sized types with `index_definitions!`, similar to Table declarations.
+A GSI and a LSI are declared identically — from the library's standpoint there is no operational difference, it
+just happens to reuses the table's partition key. Once declared, indexes plug into the same typed query API.
+
+```rust
+use dynamodb_facade::index_definitions;
+
+index_definitions! {
+    // GSI on the item type — query every item of a given type:
+    #[table = PlatformTable]
+    TypeIndex {
+        type PartitionKey = ItemType;
+        fn index_name() -> String { "iType".to_owned() }
+    }
+
+    // GSI on email — look up any user by email address:
+    #[table = PlatformTable]
+    EmailIndex {
+        type PartitionKey = Email;
+        fn index_name() -> String { "iEmail".to_owned() }
+    }
+}
+
+// Because `User` is wired to the constant `ItemType` attribute and
+// `TypeIndex` uses `ItemType` as its partition key, all users can be
+// fetched with no key condition supplied:
+let all_users /* : Vec<User> */ =
+    User::query_all_index::<TypeIndex>().all().await?;
+
+// Same for a large collection, streamed a page at a time:
+let mut enrollments = Enrollment::query_all_index::<TypeIndex>().stream();
+while let Some(page) = enrollments.try_next().await? { /* Vec<Enrollment> */ }
+
+// Look a user up by email through the GSI:
+let user /* : Option<User> */ =
+    User::query_index::<EmailIndex>(KeyCondition::pk(email_address))
+        .all()
+        .await?
+        .pop();
+```
+
+### Query with automatic pagination
+
+```rust
+// All enrollments for a user — key condition derived from the item type:
+let enrollments /* : Vec<Enrollment> */ =
+    Enrollment::query(Enrollment::key_condition(user_id))
+    .all()
+    .await?;
+
+// Query a GSI:
+let users_by_email /* : Vec<User> */ =
+    User::query_index::<EmailIndex>(KeyCondition::pk(email_address))
+    .all()
+    .await?;
+
+// Stream instead of collect:
+let mut stream = User::scan()
+    .filter(Condition::eq("role", "instructor"))
+    .stream();
+while let Some(user) = stream.try_next().await? { /* ... */ }
+```
 
 ### Composable conditions
 
@@ -255,38 +334,14 @@ let u = Update::combine(
 );
 ```
 
-### Query with automatic pagination
-
-```rust
-// All enrollments for a user — key condition derived from the item type:
-let enrollments /* : Vec<Enrollment> */ =
-    Enrollment::query(client.clone(), Enrollment::key_condition(user_id))
-    .all()
-    .await?;
-
-// Query a GSI:
-let users_by_email /* : Vec<User> */ =
-    User::query_index::<EmailIndex>(
-        client.clone(),
-        KeyCondition::pk(email_address),
-    )
-    .all()
-    .await?;
-
-// Stream instead of collect:
-let mut stream = User::scan(client.clone())
-    .filter(Condition::eq("role", "instructor"))
-    .stream();
-while let Some(user) = stream.try_next().await? { /* ... */ }
-```
-
 ### Batch writes
 
 ```rust
 let requests: Vec<_> = enrollments.iter().map(|e| e.batch_put()).collect();
 // Chunks into 25-item batches, runs them in parallel,
 // and retries UnprocessedItems with backoff.
-dynamodb_batch_write::<PlatformTable>(client, requests).await?;
+// Uses the process-global client, like the per-item operations.
+dynamodb_batch_write::<PlatformTable>(requests).await?;
 ```
 
 ### Transactions
@@ -320,10 +375,51 @@ client
 User::index_key_condition::<EmailIndex>(email).sk_begins_with("EMAIL#");
 
 // This does not compile — .condition() twice consumes the NoCondition typestate:
-user.put(client)
+user.put()
     .condition(some_cond)
     .condition(other_cond); // error: no method `.condition` on AlreadyHasCondition
 ```
+
+---
+
+## Using an Explicit Client
+
+The default [`DynamoDBItemOp`](https://docs.rs/dynamodb-facade/latest/dynamodb_facade/trait.DynamoDBItemOp.html) trait uses the process-global client installed
+with `init_global_client`, so operations carry no client argument. If a
+single global client does not fit your use case — juggling multiple clients
+across regions or accounts, per-test clients, or a library that should not own
+global state on behalf of its caller — use the
+[`explicit_client::DynamoDBItemOp`](https://docs.rs/dynamodb-facade/latest/dynamodb_facade/explicit_client/trait.DynamoDBItemOp.html) trait instead. It mirrors the default trait
+method-for-method, but every I/O method takes an
+`aws_sdk_dynamodb::Client` as its first argument.
+
+This is also the trait to reach for if you are **migrating from v0.1** of the crate and don't want to change your call-sites yet: swap the
+import and the old call sites keep compiling unchanged.
+
+```rust
+// New default — client-less, uses the process-global client:
+use dynamodb_facade::DynamoDBItemOp;
+
+let loaded /* : Option<User> */ = User::get(KeyId::pk("u-1")).await?;
+user.put().not_exists().await?;
+
+// Keeping the old behaviour — swap only the import; the call sites,
+// each passing the client explicitly, keep compiling unchanged:
+use dynamodb_facade::explicit_client::DynamoDBItemOp;
+
+let loaded /* : Option<User> */ = User::get(client.clone(), KeyId::pk("u-1")).await?;
+user.put(client.clone()).not_exists().await?;
+```
+
+Both traits return the exact same request-builder types with the same
+compile-time guarantees; only how you obtain the builder differs. You never
+implement either trait manually — both are blanket-implemented for every
+`DynamoDBItem`.
+
+The same split applies to `dynamodb_batch_write`: the default
+`dynamodb_facade::dynamodb_batch_write` uses the global client, while
+`dynamodb_facade::explicit_client::dynamodb_batch_write` takes an
+`aws_sdk_dynamodb::Client` as its first argument.
 
 ---
 
@@ -344,6 +440,10 @@ Yes. Every builder has an `.into_inner()` method returning the underlying `aws_s
 **How are conditional-check failures surfaced?**
 
 As `Error::DynamoDB(ConditionalCheckFailedException(_))`. Use `error.as_dynamodb_error()` to downcast and match on specific SDK error types. See the error-handling example in [crate docs](https://docs.rs/dynamodb-facade).
+
+**Do I have to use the process-global client?**
+
+No. The client-less API (`user.put()`, `User::get(...)`) is the ergonomic default and relies on a client installed once via `init_global_client`. If a single global client does not fit — multiple regions/accounts, per-test clients, a library that should not own global state — use the [`explicit_client::DynamoDBItemOp`](#using-an-explicit-client) trait, whose methods take a client as their first argument. Request builders also expose `with_client(...)` constructors for the same purpose.
 
 **Does it work on AWS Lambda / inside async runtimes?**
 

@@ -574,7 +574,7 @@ impl<'a> Condition<'a> {
     /// assert_eq!(format!("{cond}"), "<none>");
     /// ```
     ///
-    /// The & operator produce the same result:
+    /// The & operator produces the same result:
     ///
     /// ```
     /// use dynamodb_facade::Condition;
@@ -641,7 +641,7 @@ impl<'a> Condition<'a> {
     /// assert_eq!(format!("{cond}"), "<none>");
     /// ```
     ///
-    /// The | operator produce the same result:
+    /// The | operator produces the same result:
     ///
     /// ```
     /// use dynamodb_facade::Condition;

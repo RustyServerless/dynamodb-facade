@@ -12,6 +12,7 @@ comparison.
 
 ## Table of Contents
 
+- [0. Client Setup](#0-client-setup)
 - [1. Schema Definitions](#1-schema-definitions)
   - [1.1 Attribute Definitions](#11-attribute-definitions)
   - [1.2 Table Definition (Composite Key)](#12-table-definition-composite-key)
@@ -76,6 +77,33 @@ comparison.
 - [11. Error Handling](#11-error-handling)
 - [12. Item Inspection APIs](#12-item-inspection-apis)
 - [13. Typestate Builder Transitions](#13-typestate-builder-transitions)
+
+---
+
+## 0. Client Setup
+
+The facade uses a process-global `aws_sdk_dynamodb::Client`. Initialize it once,
+early in your program, then every operation builder picks it up implicitly — no
+`client` argument is threaded through call sites.
+
+```rust
+#[tokio::main]
+async fn main() -> dynamodb_facade::Result<()> {
+    let config = aws_config::load_from_env().await;
+    let client = aws_sdk_dynamodb::Client::new(&config);
+
+    // Set the global client once (panics if called twice):
+    dynamodb_facade::init_global_client(client);
+
+    run().await
+}
+```
+
+You can get a copy of the global client with `dynamodb_facade::global_client()`:
+
+```rust
+let client = dynamodb_facade::global_client();
+```
 
 ---
 
@@ -224,10 +252,10 @@ dynamodb_item! {
 }
 ```
 
-Both PK and SK are compile-time constants. Access via `KeyId::NONE`:
+Both PK and SK are compile-time constants. Use `KeyId::NONE` with methods expecting a KeyId:
 
 ```rust
-let config = PlatformConfig::get(client, KeyId::NONE).await?;
+let config = PlatformConfig::get(KeyId::NONE).await?;
 ```
 
 ### 2.2 Variable PK, Constant SK
@@ -429,13 +457,13 @@ Returns a deserialized `Option<T>`:
 
 ```rust
 // Singleton (const PK + SK)
-let config = PlatformConfig::get(client, KeyId::NONE).await?;
+let config = PlatformConfig::get(KeyId::NONE).await?;
 
 // By ID (variable PK, const SK)
-let user = User::get(client, KeyId::pk(user_id)).await?;
+let user = User::get(KeyId::pk(user_id)).await?;
 
 // By composite key (variable PK + SK)
-let enrollment = Enrollment::get(client, KeyId::pk(user_id).sk(course_id)).await?;
+let enrollment = Enrollment::get(KeyId::pk(user_id).sk(course_id)).await?;
 ```
 
 **Raw SDK equivalent:**
@@ -456,7 +484,7 @@ let user = resp.item.map(|item| serde_dynamo::from_item(item).unwrap());
 When you need untyped access or a subset of attributes:
 
 ```rust
-let raw_item = User::get(client, KeyId::pk(user_id))
+let raw_item = User::get(KeyId::pk(user_id))
     .raw()
     .await?;
 // raw_item: Option<Item<PlatformTable>>
@@ -467,7 +495,7 @@ let raw_item = User::get(client, KeyId::pk(user_id))
 Overwrites any existing item:
 
 ```rust
-config.put(client).await?;
+config.put().await?;
 ```
 
 ### 3.4 Put — not_exists (Create-Only)
@@ -475,7 +503,7 @@ config.put(client).await?;
 Fails with `ConditionalCheckFailedException` if item already exists:
 
 ```rust
-new_user.put(client).not_exists().await?;
+new_user.put().not_exists().await?;
 ```
 
 **Raw SDK equivalent:**
@@ -496,7 +524,7 @@ Overwrite only if a specific condition holds (e.g. not exist or expired TTL):
 
 ```rust
 course_status
-    .put(client)
+    .put()
     .condition(
         CourseStatus::not_exists()
             | Condition::lt(Expiration::NAME, now_timestamp),
@@ -510,7 +538,6 @@ Returns the old item, fails if item doesn't exist:
 
 ```rust
 let old_enrollment = Enrollment::delete_by_id(
-    client,
     KeyId::pk(user_id).sk(course_id),
 )
     .exists()
@@ -526,14 +553,13 @@ let old_enrollment = Enrollment::delete_by_id(
 Delete from an already-loaded item:
 
 ```rust
-enrollment.delete(client).await?;
+enrollment.delete().await?;
 ```
 
 ### 3.8 Update — set + exists
 
 ```rust
 User::update_by_id(
-    client,
     KeyId::pk(user_id),
     Update::set("name", new_name),
 )
@@ -567,7 +593,6 @@ Chain multiple update actions with `.and()`:
 
 ```rust
 user.update(
-    client,
     Update::set("email", new_email)
         .and(Update::set("email_verified", true)),
 )
@@ -583,7 +608,7 @@ let update = if let Some(bio) = new_bio {
 } else {
     Update::remove("bio")
 };
-User::update_by_id(client, KeyId::pk(user_id), update)
+User::update_by_id(KeyId::pk(user_id), update)
     .exists()
     .await?;
 ```
@@ -603,7 +628,7 @@ let update = Update::combine(
     .flatten(),
 );
 
-User::update_by_id(client, KeyId::pk(user_id), update)
+User::update_by_id(KeyId::pk(user_id), update)
     .exists()
     .await?;
 ```
@@ -612,17 +637,17 @@ User::update_by_id(client, KeyId::pk(user_id), update)
 
 ```rust
 // Increment: SET clicks = clicks + 1
-User::update_by_id(client, KeyId::pk(user_id), Update::increment("login_count", 1))
+User::update_by_id(KeyId::pk(user_id), Update::increment("login_count", 1))
     .exists()
     .await?;
 
 // Decrement: SET credits = credits - 5
-User::update_by_id(client, KeyId::pk(user_id), Update::decrement("credits", 5))
+User::update_by_id(KeyId::pk(user_id), Update::decrement("credits", 5))
     .exists()
     .await?;
 
 // Init + increment: SET enrollments = if_not_exists(enrollments, 0) + 1
-User::update_by_id(client, KeyId::pk(user_id), Update::init_increment("enrollments", 0, 1))
+User::update_by_id(KeyId::pk(user_id), Update::init_increment("enrollments", 0, 1))
     .exists()
     .await?;
 ```
@@ -642,18 +667,18 @@ Control what DynamoDB returns after mutation:
 
 ```rust
 // Return the updated item (default for update_by_id):
-let updated_user: User = User::update_by_id(client, KeyId::pk(user_id), update)
+let updated_user: User = User::update_by_id(KeyId::pk(user_id), update)
     .exists()
     .await?;
 
 // Return nothing (skip deserialization cost):
-User::update_by_id(client, KeyId::pk(user_id), update)
+User::update_by_id(KeyId::pk(user_id), update)
     .exists()
     .return_none()
     .await?;  // Result<()>
 
 // Instance update returning the new item:
-let updated: User = user.update(client, update)
+let updated: User = user.update(update)
     .condition(some_condition)
     .return_new()
     .await?;
@@ -663,13 +688,12 @@ let updated: User = user.update(client, update)
 
 ```rust
 // Update only if status matches:
-User::update_by_id(client, KeyId::pk(user_id), Update::set("role", "instructor"))
+User::update_by_id(KeyId::pk(user_id), Update::set("role", "instructor"))
     .condition(Condition::eq("role", "student"))
     .await?;
 
 // Optimistic concurrency — check balance before deducting:
 User::update_by_id(
-    client,
     KeyId::pk(user_id),
     Update::set("balance", new_balance),
 )
@@ -690,7 +714,7 @@ Fetch all items under a partition (e.g. all enrollments for a user):
 
 ```rust
 let enrollments /* : Vec<Enrollment> */ =
-    Enrollment::query(client, Enrollment::key_condition(user_id))
+    Enrollment::query(Enrollment::key_condition(user_id))
         .all()
         .await?;
 ```
@@ -705,7 +729,6 @@ Fetch a subset of items by sort key prefix:
 ```rust
 let assignments /* : Vec<Assignment> */ =
     Assignment::query(
-        client,
         Assignment::key_condition(course_id)
             .sk_begins_with("ASSIGN#"),
     )
@@ -719,7 +742,7 @@ For types with a constant partition key (singletons or collections with fixed PK
 
 ```rust
 let all_configs /* : Vec<PlatformConfig> */ =
-    PlatformConfig::query_all(client).all().await?;
+    PlatformConfig::query_all().all().await?;
 ```
 
 `query_all` is available when the type has `HasConstAttribute<PK>`.
@@ -733,7 +756,6 @@ use dynamodb_facade::KeyCondition;
 
 let users_by_email /* : Vec<User> */ =
     User::query_index::<EmailIndex>(
-        client,
         KeyCondition::pk(email_address),
     )
         .all()
@@ -742,7 +764,6 @@ let users_by_email /* : Vec<User> */ =
 // Composite Index — PK + SK condition:
 let user_by_id_and_type /* : Vec<User> */ =
     User::query_index::<IdTypeIndex>(
-        client,
         KeyCondition::pk(search_id).sk_eq("USER"),
     )
         .all()
@@ -755,8 +776,7 @@ let user_by_id_and_type /* : Vec<User> */ =
 use dynamodb_facade::QueryRequest;
 
 let results /* : Vec<Item<PlatformTable>> */ =
-    QueryRequest::new_index::<EmailIndex>(
-        client,
+    QueryRequest::<PlatformTable>::index_new::<EmailIndex>(
         KeyCondition::pk(email.to_string()),
     )
         .all()
@@ -769,7 +789,7 @@ Query all items of a given type via the TypeIndex:
 
 ```rust
 let all_users /* : Vec<User> */ =
-    User::query_all_index::<TypeIndex>(client).all().await?;
+    User::query_all_index::<TypeIndex>().all().await?;
 ```
 
 `query_all_index` is available when the type has `HasConstAttribute` for the PK of the queried index (`HasConstAttribute<ItemType>` in this example).
@@ -781,7 +801,7 @@ let all_users /* : Vec<User> */ =
 ### 5.1 Scan — Typed with Filter
 
 ```rust
-let active_users /* : Vec<User> */ = User::scan(client)
+let active_users /* : Vec<User> */ = User::scan()
     .filter(Condition::eq("role", "instructor"))
     .all()
     .await?;
@@ -804,7 +824,7 @@ Scan all items and dispatch by type discriminator:
 ```rust
 use dynamodb_facade::ScanRequest;
 
-let items /* : Vec<Item<PlatformTable>> */ = ScanRequest::<PlatformTable>::new(client)
+let items /* : Vec<Item<PlatformTable>> */ = ScanRequest::<PlatformTable>::new()
     .all()
     .await?;
 
@@ -826,7 +846,7 @@ for item in items {
 Scan with a PK prefix filter:
 
 ```rust
-let user_items /* : Vec<Item<PlatformTable>> */ = ScanRequest::<PlatformTable>::new(client)
+let user_items /* : Vec<Item<PlatformTable>> */ = ScanRequest::<PlatformTable>::new()
     .filter(Condition::begins_with(PK::NAME, "USER#"))
     .all()
     .await?;
@@ -1054,7 +1074,7 @@ let requests: Vec<_> = new_enrollments.iter()
     .map(|e| e.batch_put())
     .collect();
 
-dynamodb_batch_write::<PlatformTable>(client, requests).await?;
+dynamodb_batch_write::<PlatformTable>(requests).await?;
 ```
 
 `dynamodb_batch_write` automatically chunks into 25-item batches, runs in
@@ -1067,7 +1087,7 @@ let requests: Vec<_> = enrollments.iter()
     .map(|e| e.batch_delete())
     .collect();
 
-dynamodb_batch_write::<PlatformTable>(client, requests).await?;
+dynamodb_batch_write::<PlatformTable>(requests).await?;
 ```
 
 Or by ID without loading the item:
@@ -1077,7 +1097,7 @@ let requests: Vec<_> = enrollment_keys.iter()
     .map(|key_id| Enrollment::batch_delete_by_id(key_id))
     .collect();
 
-dynamodb_batch_write::<PlatformTable>(client, requests).await?;
+dynamodb_batch_write::<PlatformTable>(requests).await?;
 ```
 
 ### 9.3 Batch Mixed (Put + Delete)
@@ -1097,7 +1117,7 @@ let requests: Vec<_> = items.into_iter()
     })
     .collect();
 
-dynamodb_batch_write::<PlatformTable>(client, requests).await?;
+dynamodb_batch_write::<PlatformTable>(requests).await?;
 ```
 
 **Raw SDK equivalent (batch write with 25-item chunking + retry):**
@@ -1111,7 +1131,7 @@ dynamodb_batch_write::<PlatformTable>(client, requests).await?;
 
 ## 10. Transactions
 
-Transactions use the native `aws_sdk_dynamodb` `transact_write_items()` builder,
+Transactions use the native `aws_sdk_dynamodb::Client::transact_write_items()` builder,
 but facade types generate each `TransactWriteItem` with type-safe conditions.
 
 ### 10.1 Transact Put + Update
@@ -1119,9 +1139,9 @@ but facade types generate each `TransactWriteItem` with type-safe conditions.
 Create an enrollment and atomically increment user's enrollment count:
 
 ```rust
-use dynamodb_facade::DynamoDBItemTransactOp;
+use dynamodb_facade::{DynamoDBItemTransactOp, global_client};
 
-client
+global_client()
     .transact_write_items()
     .transact_items(
         enrollment.transact_put()
@@ -1149,7 +1169,7 @@ client
 Remove an enrollment and decrement user's count:
 
 ```rust
-client
+global_client()
     .transact_write_items()
     .transact_items(
         Enrollment::transact_delete_by_id(KeyId::pk(user_id).sk(course_id))
@@ -1173,7 +1193,7 @@ client
 Atomically replace one enrollment with another:
 
 ```rust
-client
+global_client()
     .transact_write_items()
     .transact_items(
         old_enrollment.transact_delete()
@@ -1197,7 +1217,7 @@ client
 Include a pure condition check (no mutation) in a transaction:
 
 ```rust
-client
+global_client()
     .transact_write_items()
     .transact_items(
         user.transact_condition(
@@ -1217,7 +1237,7 @@ client
 ### Complex Transaction: Multi-Update with Optimistic Concurrency
 
 ```rust
-let transaction = client.transact_write_items();
+let transaction = global_client().transact_write_items();
 
 let transaction = transaction.transact_items(
     user.transact_update(Update::combine([
@@ -1323,7 +1343,7 @@ a visual summary:
 **PutItemRequest:**
 
 ```
-put(client)                           → PutItemRequest<Typed, ReturnNothing, NoCondition>
+item.put()                            → PutItemRequest<Typed, ReturnNothing, NoCondition>
   .not_exists() / .condition(cond)    → ...<..., AlreadyHasCondition>   (one-shot)
   .return_old()                       → ...<..., Return<Old>, ...>
   .return_none()                      → ...<..., ReturnNothing, ...>    (from Return<Old>)
@@ -1334,7 +1354,7 @@ put(client)                           → PutItemRequest<Typed, ReturnNothing, N
 **GetItemRequest:**
 
 ```
-get(client, key_id)                   → GetItemRequest<Typed, NoProjection>
+get(key_id)                           → GetItemRequest<Typed, NoProjection>
   .raw()                              → ...<Raw, ...>
   .project(projection)                → ...<Raw, AlreadyHasProjection>  (forces Raw)
   .consistent_read()                  → self
@@ -1344,7 +1364,7 @@ get(client, key_id)                   → GetItemRequest<Typed, NoProjection>
 **UpdateItemRequest:**
 
 ```
-update_by_id(client, key_id, update)  → UpdateItemRequest<Typed, Return<New>, NoCondition>
+update_by_id(key_id, update)          → UpdateItemRequest<Typed, Return<New>, NoCondition>
   .exists() / .condition(cond)        → ...<..., AlreadyHasCondition>
   .return_old()                       → ...<..., Return<Old>, ...>
   .return_new()                       → ...<..., Return<New>, ...>
@@ -1356,7 +1376,7 @@ update_by_id(client, key_id, update)  → UpdateItemRequest<Typed, Return<New>, 
 **QueryRequest / ScanRequest:**
 
 ```
-query(client, key_cond)               → QueryRequest<Typed, NoFilter, NoProjection>
+query(key_cond)                       → QueryRequest<Typed, NoFilter, NoProjection>
   .filter(cond)                       → ...<..., AlreadyHasFilter, ...>
   .project(projection)                → ...<Raw, ..., AlreadyHasProjection>
   .limit(n) / .scan_index_forward(b)  → self
@@ -1383,6 +1403,7 @@ does not have the `.condition()` / `.filter()` method.
 
 | Concern              | Raw `aws-sdk-dynamodb`                                  | `dynamodb-facade`                                 |
 | -------------------- | ------------------------------------------------------- | ------------------------------------------------- |
+| **Client wiring**    | Thread `&Client` through every call                     | Global client set once via `init_global_client`   |
 | **Key construction** | Manual `HashMap<String, AV>`, format strings            | `KeyId::pk(id).sk(id)`, type-checked              |
 | **Expressions**      | Raw strings (`"SET #n = :v"`), separate name/value maps | `Update::set("n", v)`, auto-managed placeholders  |
 | **Conditions**       | String concatenation, manual `:placeholder` tracking    | `Condition::eq(...)`, `&` / `\|` operators        |

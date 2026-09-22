@@ -151,7 +151,8 @@ impl<TD: TableDefinition, T> TransactPutRequest<TD, T, NoCondition> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, DynamoDBItemTransactOp, Condition};
     ///
-    /// let transact_item = sample_enrollment()
+    /// let enrollment = sample_enrollment();
+    /// let transact_item = enrollment
     ///     .transact_put()
     ///     .condition(
     ///         Enrollment::not_exists() |
@@ -181,7 +182,8 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD>> TransactPutRequest<TD, T, NoCondi
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemTransactOp;
     ///
-    /// let transact_item = sample_enrollment().transact_put().exists().build();
+    /// let enrollment = sample_enrollment();
+    /// let transact_item = enrollment.transact_put().exists().build();
     /// ```
     pub fn exists(mut self) -> TransactPutRequest<TD, T, AlreadyHasCondition> {
         self.builder = T::exists().apply(self.builder);
@@ -201,7 +203,8 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD>> TransactPutRequest<TD, T, NoCondi
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemTransactOp;
     ///
-    /// let transact_item = sample_enrollment().transact_put().not_exists().build();
+    /// let enrollment = sample_enrollment();
+    /// let transact_item = enrollment.transact_put().not_exists().build();
     /// ```
     pub fn not_exists(mut self) -> TransactPutRequest<TD, T, AlreadyHasCondition> {
         self.builder = T::not_exists().apply(self.builder);
@@ -341,7 +344,8 @@ impl<TD: TableDefinition, T> TransactDeleteRequest<TD, T, NoCondition> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, DynamoDBItemTransactOp, Condition};
     ///
-    /// let transact_item = sample_enrollment()
+    /// let enrollment = sample_enrollment();
+    /// let transact_item = enrollment
     ///     .transact_delete()
     ///     .condition(Enrollment::exists() & Condition::not_exists("completed_at"))
     ///     .build();
@@ -368,7 +372,8 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD>> TransactDeleteRequest<TD, T, NoCo
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemTransactOp;
     ///
-    /// let transact_item = sample_enrollment().transact_delete().exists().build();
+    /// let enrollment = sample_enrollment();
+    /// let transact_item = enrollment.transact_delete().exists().build();
     /// ```
     pub fn exists(self) -> TransactDeleteRequest<TD, T, AlreadyHasCondition> {
         self.condition(T::exists())
@@ -764,7 +769,8 @@ pub trait DynamoDBItemTransactOp<TD: TableDefinition>: DynamoDBItemOp<TD> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemTransactOp;
     ///
-    /// let transact_item = sample_enrollment().transact_put().not_exists().build();
+    /// let enrollment = sample_enrollment();
+    /// let transact_item = enrollment.transact_put().not_exists().build();
     /// ```
     fn transact_put(&self) -> TransactPutRequest<TD, Self>
     where
@@ -784,7 +790,8 @@ pub trait DynamoDBItemTransactOp<TD: TableDefinition>: DynamoDBItemOp<TD> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemTransactOp;
     ///
-    /// let transact_item = sample_enrollment().transact_delete().exists().build();
+    /// let enrollment = sample_enrollment();
+    /// let transact_item = enrollment.transact_delete().exists().build();
     /// ```
     fn transact_delete(&self) -> TransactDeleteRequest<TD, Self> {
         TransactDeleteRequest::new(self.get_key())
@@ -817,7 +824,8 @@ pub trait DynamoDBItemTransactOp<TD: TableDefinition>: DynamoDBItemOp<TD> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemTransactOp, Update};
     ///
-    /// let transact_item = sample_user()
+    /// let user = sample_user();
+    /// let transact_item = user
     ///     .transact_update(Update::set("role", "instructor"))
     ///     .exists()
     ///     .build();
@@ -862,7 +870,8 @@ pub trait DynamoDBItemTransactOp<TD: TableDefinition>: DynamoDBItemOp<TD> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, DynamoDBItemTransactOp, Condition};
     ///
-    /// let transact_check = sample_user()
+    /// let user = sample_user();
+    /// let transact_check = user
     ///     .transact_condition(User::exists() & Condition::eq("role", "admin"))
     ///     .build();
     /// ```

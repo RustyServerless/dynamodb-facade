@@ -12,8 +12,8 @@
 //! | Entity | PK | SK |
 //! |---|---|---|
 //! | [`PlatformConfig`] | `"PLATFORM_CONFIG"` | `"PLATFORM_CONFIG"` |
-//! | [`User`] | `"USER#<uuid>"` | `"USER"` |
-//! | [`Enrollment`] | `"USER#<uuid>"` | `"ENROLL#<uuid>"` |
+//! | [`User`] | `"USER#<id>"` | `"USER"` |
+//! | [`Enrollment`] | `"USER#<user_id>"` | `"ENROLL#<course_id>"` |
 //!
 //! GSIs:
 //! - [`TypeIndex`] — partition key `_TYPE`; query all items of a given type
@@ -86,7 +86,7 @@ crate::index_definitions! {
 /// Platform-wide configuration (singleton item).
 ///
 /// Stored at `PK = "PLATFORM_CONFIG"`, `SK = "PLATFORM_CONFIG"`.
-/// Accessed via `PlatformConfig::get(client, KeyId::NONE)`.
+/// Accessed via `PlatformConfig::get(KeyId::NONE)`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlatformConfig {
     pub max_enrollments: u32,
@@ -107,7 +107,7 @@ crate::dynamodb_item! {
 /// A registered user on the platform.
 ///
 /// Stored at `PK = "USER#<id>"`, `SK = "USER"`.
-/// Accessed via `User::get(client, KeyId::pk(user_id))`.
+/// Accessed via `User::get(KeyId::pk(user_id))`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: String,
@@ -138,7 +138,7 @@ crate::dynamodb_item! {
 /// A user's enrollment in a course.
 ///
 /// Stored at `PK = "USER#<user_id>"`, `SK = "ENROLL#<course_id>"`.
-/// Accessed via `Enrollment::get(client, KeyId::pk(user_id).sk(course_id))`.
+/// Accessed via `Enrollment::get(KeyId::pk(user_id).sk(course_id))`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Enrollment {
     pub user_id: String,

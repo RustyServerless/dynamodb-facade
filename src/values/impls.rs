@@ -1,6 +1,8 @@
 use std::{
     borrow::Cow,
     collections::{BTreeSet, HashSet},
+    rc::Rc,
+    sync::Arc,
 };
 
 use aws_sdk_dynamodb::primitives::Blob;
@@ -49,6 +51,30 @@ impl IntoAttributeValue for Cow<'_, str> {
     }
 }
 impl IntoStringAttributeValue for Cow<'_, str> {}
+
+impl IntoAttributeValue for Rc<str> {
+    #[inline]
+    fn into_attribute_value(self) -> AttributeValue {
+        AttributeValue::S((*self).to_owned())
+    }
+}
+impl IntoStringAttributeValue for Rc<str> {}
+
+impl IntoAttributeValue for Arc<str> {
+    #[inline]
+    fn into_attribute_value(self) -> AttributeValue {
+        AttributeValue::S((*self).to_owned())
+    }
+}
+impl IntoStringAttributeValue for Arc<str> {}
+
+impl IntoAttributeValue for Box<str> {
+    #[inline]
+    fn into_attribute_value(self) -> AttributeValue {
+        AttributeValue::S((*self).to_owned())
+    }
+}
+impl IntoStringAttributeValue for Box<str> {}
 
 // -- Bool ---------------------------------------------------------------------
 

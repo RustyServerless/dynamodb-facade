@@ -296,7 +296,7 @@ macro_rules! key_schema {
 /// **always** the input type of `attribute_value(id)`. The two functions
 /// form a pipeline: `attribute_id` extracts a lightweight identifier from
 /// `&self`, and `attribute_value` transforms it into the final DynamoDB
-/// value. This separation allows for independant usages of the methods,
+/// value. This separation allows for independent use of the methods,
 /// in particular it powers the "_by_id" variants of the get/update/delete
 /// operations.
 ///
@@ -994,7 +994,7 @@ macro_rules! table_definitions {
     };
 }
 
-/// Defines one or more DynamoDB Secondary Index (LSI or GSI) zero-sized types implementing
+/// Defines one or more DynamoDB Secondary Indexes (LSI or GSI) zero-sized types implementing
 /// [`IndexDefinition`](crate::IndexDefinition).
 ///
 /// Each definition generates a `pub struct` associated with a specific table

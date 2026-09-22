@@ -62,7 +62,7 @@ enum UpdateSetRhsInner<'a> {
 pub struct UpdateSetRhs<'a>(UpdateSetRhsInner<'a>);
 
 impl<'a> UpdateSetRhs<'a> {
-    /// Creates an RHS that reference a literal value.
+    /// Creates an RHS that references a literal value.
     ///
     /// This is the simplest form. For most cases, [`Update::set`] is more
     /// ergonomic and equivalent.

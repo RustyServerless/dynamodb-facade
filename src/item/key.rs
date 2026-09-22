@@ -7,7 +7,7 @@ use super::*;
 /// `Key<TD>` holds only the key attributes (PK, and SK for composite-key tables)
 /// for the table defined by the [`TableDefinition`] `TD`.
 ///
-/// A `Key` can only be obtain from a type implementing [`KeyBuilder`] —
+/// A `Key` can only be obtained from a type implementing [`KeyBuilder`] —
 /// typically any [`DynamoDBItem`] — or by extracting it from an [`Item`].
 ///
 /// # Examples

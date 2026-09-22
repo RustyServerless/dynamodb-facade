@@ -8,8 +8,10 @@ use aws_sdk_dynamodb::operation::update_item::builders::UpdateItemFluentBuilder;
 /// Builder for a DynamoDB `UpdateItem` request.
 ///
 /// Constructed via [`DynamoDBItemOp::update`] / [`DynamoDBItemOp::update_by_id`]
-/// (typed, with a concrete `T`) or [`UpdateItemRequest::new`] (stand-alone,
-/// raw output). The builder provides:
+/// (typed, with a concrete `T`) or [`UpdateItemRequest::new`] / [`UpdateItemRequest::with_client`]
+/// (stand-alone, raw output).
+///
+/// The builder provides:
 ///
 /// - **Output format** — the result can be deserialized into `T`.
 ///   Call [`.raw()`][UpdateItemRequest::raw] to receive an untyped [`Item<TD>`]
@@ -32,7 +34,7 @@ use aws_sdk_dynamodb::operation::update_item::builders::UpdateItemFluentBuilder;
 ///   single condition expression per request, so this can only be called once.
 ///
 /// The builder implements [`IntoFuture`], so it can
-/// be `.await`ed directly.
+/// be `.await`ed directly without calling `.execute()` explicitly.
 ///
 /// # Errors
 ///
@@ -45,40 +47,32 @@ use aws_sdk_dynamodb::operation::update_item::builders::UpdateItemFluentBuilder;
 /// # use dynamodb_facade::test_fixtures::*;
 /// use dynamodb_facade::{DynamoDBItemOp, Condition, KeyId, Update};
 ///
-/// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-/// # let client = cclient.clone();
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// // Simple update by ID (returns the updated item by default)
 /// let updated /* : User */ = User::update_by_id(
-///     client,
 ///     KeyId::pk("user-1"),
 ///     Update::set("role", "instructor"),
 /// )
 /// .await?;
 ///
-/// # let client = cclient.clone();
 /// // Update guarded by existence
 /// let updated /* : User */ = User::update_by_id(
-///     client,
 ///     KeyId::pk("user-1"),
 ///     Update::set("role", "instructor"),
 /// )
 /// .exists()
 /// .await?;
 ///
-/// # let client = cclient.clone();
 /// // Update with a custom condition
 /// let updated /* : User */ = User::update_by_id(
-///     client,
 ///     KeyId::pk("user-1"),
 ///     Update::set("role", "instructor"),
 /// )
 /// .condition(Condition::eq("role", "student"))
 /// .await?;
 ///
-/// # let client = cclient.clone();
 /// // Update without returning the item
 /// User::update_by_id(
-///     client,
 ///     KeyId::pk("user-1"),
 ///     Update::set("name", "Bob"),
 /// )
@@ -117,9 +111,10 @@ impl<TD: TableDefinition, T, O: OutputFormat, R: ReturnValue, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let sdk_builder = sample_user()
-    ///     .update(client, Update::set("role", "instructor"))
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let user = sample_user();
+    /// let sdk_builder = user
+    ///     .update(Update::set("role", "instructor"))
     ///     .into_inner();
     /// // configure sdk_builder further, then call .send().await
     /// # Ok(())
@@ -130,10 +125,11 @@ impl<TD: TableDefinition, T, O: OutputFormat, R: ReturnValue, C: ConditionState>
     }
 }
 
-// -- Stand-alone constructor (ReturnNothing, any C, T = (), O = Raw)
+// -- Stand-alone constructor (ReturnNothing, NoCondition, T = (), O = Raw)
 
 impl<TD: TableDefinition> UpdateItemRequest<TD> {
-    /// Creates a stand-alone `UpdateItemRequest` with raw output (`T = ()`, `O = Raw`).
+    /// Creates a stand-alone `UpdateItemRequest` with raw output (`T = ()`, `O = Raw`) using
+    /// the globally defined [`aws_sdk_dynamodb::Client`].
     ///
     /// Use this when you already have a [`Key<TD>`] and an [`Update`] expression
     /// and do not need typed deserialization of the returned item. For typed
@@ -146,14 +142,39 @@ impl<TD: TableDefinition> UpdateItemRequest<TD> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{UpdateItemRequest, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let key = sample_user_item().into_key_only();
-    /// UpdateItemRequest::<PlatformTable>::new(client, key, Update::set("role", "instructor"))
+    /// UpdateItemRequest::<PlatformTable>::new(key, Update::set("role", "instructor"))
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(client: aws_sdk_dynamodb::Client, key: Key<TD>, update: Update<'_>) -> Self {
+    pub fn new(key: Key<TD>, update: Update<'_>) -> Self {
+        Self::_new(global_client(), key, update)
+    }
+
+    /// Creates a stand-alone `UpdateItemRequest` with raw output (`T = ()`, `O = Raw`) using
+    /// the provided [`aws_sdk_dynamodb::Client`].
+    ///
+    /// Use this when you already have a [`Key<TD>`] and an [`Update`] expression
+    /// and do not need typed deserialization of the returned item. For typed
+    /// access, prefer [`explicit_client::DynamoDBItemOp::update`] or
+    /// [`explicit_client::DynamoDBItemOp::update_by_id`] instead.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use dynamodb_facade::test_fixtures::*;
+    /// use dynamodb_facade::{UpdateItemRequest, Update};
+    ///
+    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// let key = sample_user_item().into_key_only();
+    /// UpdateItemRequest::<PlatformTable>::with_client(client, key, Update::set("role", "instructor"))
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_client(client: aws_sdk_dynamodb::Client, key: Key<TD>, update: Update<'_>) -> Self {
         Self::_new(client, key, update)
     }
 }
@@ -198,9 +219,10 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let before /* : Option<User> */ = sample_user()
-    ///     .update(client, Update::set("role", "instructor"))
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let user = sample_user();
+    /// let before /* : Option<User> */ = user
+    ///     .update(Update::set("role", "instructor"))
     ///     .exists()
     ///     .return_old()
     ///     .await?;
@@ -226,9 +248,10 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let after /* : User */ = sample_user()
-    ///     .update(client, Update::set("role", "instructor"))
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let user = sample_user();
+    /// let after /* : User */ = user
+    ///     .update(Update::set("role", "instructor"))
     ///     .exists()
     ///     .return_new()
     ///     .await?;
@@ -265,7 +288,6 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
     /// // update_by_id defaults to Return<New>; switch to Return<Old>
     /// let before /* : Option<User> */ = User::update_by_id(
-    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("role", "instructor"),
     /// )
@@ -296,7 +318,6 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
     /// // update_by_id defaults to Return<New>; opt out
     /// User::update_by_id(
-    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("role", "instructor"),
     /// )
@@ -333,9 +354,10 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let after /* : User */ = sample_user()
-    ///     .update(client, Update::set("role", "instructor"))
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let user = sample_user();
+    /// let after /* : User */ = user
+    ///     .update(Update::set("role", "instructor"))
     ///     .exists()
     ///     .return_old()
     ///     .return_new()
@@ -361,9 +383,10 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// sample_user()
-    ///     .update(client, Update::set("role", "instructor"))
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let user = sample_user();
+    /// user
+    ///     .update(Update::set("role", "instructor"))
     ///     .exists()
     ///     .return_old()
     ///     .return_none()
@@ -404,7 +427,6 @@ impl<TD: TableDefinition, T, O: OutputFormat, R: ReturnValue>
     /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
     /// // Update role only if the current role is not "student"
     /// User::update_by_id(
-    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("role", "instructor"),
     /// )
@@ -439,9 +461,8 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD>, O: OutputFormat, R: ReturnValue>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// User::update_by_id(
-    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("name", "Bob"),
     /// )
@@ -465,9 +486,8 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD>, O: OutputFormat, R: ReturnValue>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// User::update_by_id(
-    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("role", "student"),
     /// )
@@ -489,7 +509,8 @@ impl<TD: TableDefinition, T, R: ReturnValue, C: ConditionState>
     /// Switches the output format from `Typed` to `Raw`.
     ///
     /// After calling `.raw()`, [`execute`][UpdateItemRequest::execute] returns
-    /// [`Item<TD>`] instead of `T` when a return value is requested.
+    /// [`Item<TD>`] instead of `T` when `Return<New>` is active, and
+    /// `Option<Item<TD>>` instead of `Option<T>` when `Return<Old>` is active.
     /// This transition is one-way.
     ///
     /// # Examples
@@ -498,9 +519,8 @@ impl<TD: TableDefinition, T, R: ReturnValue, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let raw_new = User::update_by_id(
-    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("role", "instructor"),
     /// )
@@ -540,9 +560,8 @@ impl<TD: TableDefinition, T, O: OutputFormat, C: ConditionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// User::update_by_id(
-    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("name", "Bob"),
     /// )
@@ -600,9 +619,8 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD> + DeserializeOwned, C: ConditionSt
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let before /* : Option<User> */ = User::update_by_id(
-    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("role", "instructor"),
     /// )
@@ -669,9 +687,8 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD> + DeserializeOwned, C: ConditionSt
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let updated /* : User */ = User::update_by_id(
-    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("role", "instructor"),
     /// )
@@ -730,9 +747,8 @@ impl<TD: TableDefinition, T, C: ConditionState> UpdateItemRequest<TD, T, Raw, Re
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let raw /* : Option<dynamodb_facade::Item<PlatformTable>> */ = User::update_by_id(
-    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("role", "instructor"),
     /// )
@@ -795,9 +811,8 @@ impl<TD: TableDefinition, T, C: ConditionState> UpdateItemRequest<TD, T, Raw, Re
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId, Update};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let raw /* : dynamodb_facade::Item<PlatformTable> */ = User::update_by_id(
-    ///     client,
     ///     KeyId::pk("user-1"),
     ///     Update::set("role", "instructor"),
     /// )

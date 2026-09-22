@@ -1,12 +1,17 @@
 use super::*;
 
 use aws_sdk_dynamodb::operation::query::builders::QueryFluentBuilder;
+use futures_core::Stream;
+use futures_util::StreamExt;
 
 /// Builder for a DynamoDB `Query` request.
 ///
 /// Constructed via [`DynamoDBItemOp::query`] / [`DynamoDBItemOp::query_index`]
 /// (typed, with a concrete `T`) or [`QueryRequest::new`] /
-/// [`QueryRequest::new_index`] (stand-alone, raw output). The builder provides:
+/// [`QueryRequest::index_new`] / [`QueryRequest::with_client`] /
+/// [`QueryRequest::index_with_client`] (stand-alone, raw output).
+///
+/// The builder provides:
 ///
 /// - **Output format** — the result can be deserialized into `T`.
 ///   Call [`.raw()`][QueryRequest::raw] to receive untyped [`Item<TD>`]
@@ -32,26 +37,22 @@ use aws_sdk_dynamodb::operation::query::builders::QueryFluentBuilder;
 /// # use dynamodb_facade::test_fixtures::*;
 /// use dynamodb_facade::{DynamoDBItemOp, Condition, KeyCondition};
 ///
-/// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-/// # let client = cclient.clone();
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// // Simple query
 /// let enrollments /* : Vec<Enrollment> */ =
-///     Enrollment::query(client, Enrollment::key_condition("user-1"))
+///     Enrollment::query(Enrollment::key_condition("user-1"))
 ///         .all()
 ///         .await?;
 ///
-/// # let client = cclient.clone();
 /// // Query with a filter
 /// let advanced /* : Vec<Enrollment> */ =
-///     Enrollment::query(client, Enrollment::key_condition("user-1"))
+///     Enrollment::query(Enrollment::key_condition("user-1"))
 ///         .filter(Condition::gt("progress", 0.5))
 ///         .all()
 ///         .await?;
 ///
-/// # let client = cclient.clone();
 /// // Query a secondary index
 /// let users /* : Vec<User> */ = User::query_index::<EmailIndex>(
-///     client,
 ///     KeyCondition::pk("alice@example.com".to_owned()),
 /// )
 /// .all()
@@ -74,7 +75,8 @@ pub struct QueryRequest<
 // -- Stand-alone constructors (T = (), O = Raw)
 
 impl<TD: TableDefinition> QueryRequest<TD> {
-    /// Creates a stand-alone `QueryRequest` against the table's primary key schema.
+    /// Creates a stand-alone `QueryRequest` against the table's primary key schema using
+    /// the globally defined [`aws_sdk_dynamodb::Client`].
     ///
     /// Output is raw (`T = ()`, `O = Raw`). For typed access, prefer
     /// [`DynamoDBItemOp::query`] instead.
@@ -85,8 +87,33 @@ impl<TD: TableDefinition> QueryRequest<TD> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{QueryRequest, KeyCondition};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let items = QueryRequest::<PlatformTable>::new(
+    ///     KeyCondition::pk("USER#user-1".to_owned()),
+    /// )
+    /// .all()
+    /// .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new(key_condition: KeyCondition<'_, TD::KeySchema, impl KeyConditionState>) -> Self {
+        Self::_new(global_client(), key_condition)
+    }
+
+    /// Creates a stand-alone `QueryRequest` against the table's primary key schema using
+    /// the provided [`aws_sdk_dynamodb::Client`].
+    ///
+    /// Output is raw (`T = ()`, `O = Raw`). For typed access, prefer
+    /// [`explicit_client::DynamoDBItemOp::query`] instead.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use dynamodb_facade::test_fixtures::*;
+    /// use dynamodb_facade::{QueryRequest, KeyCondition};
+    ///
+    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// let items = QueryRequest::<PlatformTable>::with_client(
     ///     client,
     ///     KeyCondition::pk("USER#user-1".to_owned()),
     /// )
@@ -95,14 +122,15 @@ impl<TD: TableDefinition> QueryRequest<TD> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(
+    pub fn with_client(
         client: aws_sdk_dynamodb::Client,
         key_condition: KeyCondition<'_, TD::KeySchema, impl KeyConditionState>,
     ) -> Self {
         Self::_new(client, key_condition)
     }
 
-    /// Creates a stand-alone `QueryRequest` against a secondary index.
+    /// Creates a stand-alone `QueryRequest` against a secondary index using
+    /// the globally defined [`aws_sdk_dynamodb::Client`].
     ///
     /// Output is raw (`T = ()`, `O = Raw`). For typed access, prefer
     /// [`DynamoDBItemOp::query_index`] instead.
@@ -113,8 +141,35 @@ impl<TD: TableDefinition> QueryRequest<TD> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{QueryRequest, KeyCondition};
     ///
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let items = QueryRequest::<PlatformTable>::index_new::<EmailIndex>(
+    ///     KeyCondition::pk("alice@example.com".to_owned()),
+    /// )
+    /// .all()
+    /// .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn index_new<I: IndexDefinition<TD>>(
+        key_condition: KeyCondition<'_, I::KeySchema, impl KeyConditionState>,
+    ) -> Self {
+        Self::_index_new::<I>(global_client(), key_condition)
+    }
+
+    /// Creates a stand-alone `QueryRequest` against a secondary index using
+    /// the provided [`aws_sdk_dynamodb::Client`].
+    ///
+    /// Output is raw (`T = ()`, `O = Raw`). For typed access, prefer
+    /// [`explicit_client::DynamoDBItemOp::query_index`] instead.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use dynamodb_facade::test_fixtures::*;
+    /// use dynamodb_facade::{QueryRequest, KeyCondition};
+    ///
     /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let items = QueryRequest::<PlatformTable>::new_index::<EmailIndex>(
+    /// let items = QueryRequest::<PlatformTable>::index_with_client::<EmailIndex>(
     ///     client,
     ///     KeyCondition::pk("alice@example.com".to_owned()),
     /// )
@@ -123,11 +178,11 @@ impl<TD: TableDefinition> QueryRequest<TD> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new_index<I: IndexDefinition<TD>>(
+    pub fn index_with_client<I: IndexDefinition<TD>>(
         client: aws_sdk_dynamodb::Client,
         key_condition: KeyCondition<'_, I::KeySchema, impl KeyConditionState>,
     ) -> Self {
-        Self::_new_index::<I>(client, key_condition)
+        Self::_index_new::<I>(client, key_condition)
     }
 }
 
@@ -148,7 +203,7 @@ impl<TD: TableDefinition, T, O: OutputFormat, F: FilterState, P: ProjectionState
         }
     }
 
-    pub(super) fn _new_index<I: IndexDefinition<TD>>(
+    pub(super) fn _index_new<I: IndexDefinition<TD>>(
         client: aws_sdk_dynamodb::Client,
         key_condition: KeyCondition<'_, I::KeySchema, impl KeyConditionState>,
     ) -> Self {
@@ -174,9 +229,9 @@ impl<TD: TableDefinition, T, O: OutputFormat, F: FilterState, P: ProjectionState
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let enrollments /* : Vec<Enrollment> */ =
-    ///     Enrollment::query(client, Enrollment::key_condition("user-1"))
+    ///     Enrollment::query(Enrollment::key_condition("user-1"))
     ///         .consistent_read()
     ///         .all()
     ///         .await?;
@@ -203,10 +258,10 @@ impl<TD: TableDefinition, T, O: OutputFormat, F: FilterState, P: ProjectionState
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// // Evaluate at most 10 items per page
     /// let enrollments /* : Vec<Enrollment> */ =
-    ///     Enrollment::query(client, Enrollment::key_condition("user-1"))
+    ///     Enrollment::query(Enrollment::key_condition("user-1"))
     ///         .limit(10)
     ///         .all()
     ///         .await?;
@@ -228,10 +283,10 @@ impl<TD: TableDefinition, T, O: OutputFormat, F: FilterState, P: ProjectionState
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// // Return enrollments in reverse sort-key order
     /// let enrollments /* : Vec<Enrollment> */ =
-    ///     Enrollment::query(client, Enrollment::key_condition("user-1"))
+    ///     Enrollment::query(Enrollment::key_condition("user-1"))
     ///         .reverse()
     ///         .all()
     ///         .await?;
@@ -255,9 +310,9 @@ impl<TD: TableDefinition, T, O: OutputFormat, F: FilterState, P: ProjectionState
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let sdk_builder =
-    ///     Enrollment::query(client, Enrollment::key_condition("user-1")).into_inner();
+    ///     Enrollment::query(Enrollment::key_condition("user-1")).into_inner();
     /// // configure sdk_builder further, then call .send().await
     /// # Ok(())
     /// # }
@@ -285,10 +340,10 @@ impl<TD: TableDefinition, T, O: OutputFormat, P: ProjectionState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, Condition};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// // Query enrollments with progress above 50%
     /// let advanced /* : Vec<Enrollment> */ =
-    ///     Enrollment::query(client, Enrollment::key_condition("user-1"))
+    ///     Enrollment::query(Enrollment::key_condition("user-1"))
     ///         .filter(Condition::gt("progress", 0.5))
     ///         .all()
     ///         .await?;
@@ -322,10 +377,10 @@ impl<TD: TableDefinition, T, O: OutputFormat, F: FilterState>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, Projection};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// // Fetch only the "progress" attribute for each enrollment
     /// let partial /* : Vec<Item<PlatformTable>> */ =
-    ///     Enrollment::query(client, Enrollment::key_condition("user-1"))
+    ///     Enrollment::query(Enrollment::key_condition("user-1"))
     ///         .project(Projection::new(["progress"]))
     ///         .all()
     ///         .await?;
@@ -362,9 +417,9 @@ impl<TD: TableDefinition, T, F: FilterState, P: ProjectionState> QueryRequest<TD
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let raw_items /* : Vec<Item<PlatformTable>> */ =
-    ///     Enrollment::query(client, Enrollment::key_condition("user-1"))
+    ///     Enrollment::query(Enrollment::key_condition("user-1"))
     ///         .raw()
     ///         .all()
     ///         .await?;
@@ -406,9 +461,9 @@ impl<
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::DynamoDBItemOp;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let enrollments /* : Vec<Enrollment> */ =
-    ///     Enrollment::query(client, Enrollment::key_condition("user-1"))
+    ///     Enrollment::query(Enrollment::key_condition("user-1"))
     ///         .all()
     ///         .await?;
     /// # Ok(())
@@ -438,8 +493,8 @@ impl<
     /// use futures_util::StreamExt;
     /// use std::pin::pin;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let stream = Enrollment::query(client, Enrollment::key_condition("user-1"))
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let stream = Enrollment::query(Enrollment::key_condition("user-1"))
     ///     .stream();
     /// // Must pin the stream
     /// let mut stream = pin!(stream);
@@ -478,9 +533,8 @@ impl<TD: TableDefinition, T, F: FilterState, P: ProjectionState> QueryRequest<TD
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, QueryRequest, KeyCondition};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let raw_items = QueryRequest::<PlatformTable>::new(
-    ///     client,
     ///     KeyCondition::pk("USER#user-1".to_owned()),
     /// )
     /// .all()
@@ -507,9 +561,8 @@ impl<TD: TableDefinition, T, F: FilterState, P: ProjectionState> QueryRequest<TD
     /// use futures_util::StreamExt;
     /// use std::pin::pin;
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// let stream = QueryRequest::<PlatformTable>::new(
-    ///     client,
     ///     KeyCondition::pk("USER#user-1".to_owned()),
     /// )
     /// .stream();

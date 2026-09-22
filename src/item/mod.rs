@@ -42,7 +42,7 @@ pub use key_id::*;
 /// # Associated Types
 ///
 /// `AdditionalAttributes` lists the non-key attributes that are written by
-/// [`Item::minimal_from`] (e.g. type discriminators such as `_TYPE`). Usualy,
+/// [`Item::minimal_from`] (e.g. type discriminators such as `_TYPE`). Usually,
 /// additional attributes are there to ensure the resulting DynamoDB item is included
 /// in some Local or Global Secondary Indexes.
 ///
@@ -95,7 +95,7 @@ pub use key_id::*;
 /// fn _assert_dynamodb_item<DBI: DynamoDBItem<PlatformTable> + DynamoDBItemOp<PlatformTable>>() {}
 /// _assert_dynamodb_item::<User>();
 ///
-/// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// let user = User {
 ///     id: "user-1".to_owned(),
 ///     name: "Alice".to_owned(),
@@ -103,18 +103,15 @@ pub use key_id::*;
 ///     role: "student".to_owned(),
 /// };
 ///
-/// # let client = cclient.clone();
 /// // Put the User in DynamoDB if it does not already exist
-/// user.put(client).not_exists().await?;
+/// user.put().not_exists().await?;
 ///
-/// # let client = cclient.clone();
 /// // Retrieve an existing user
-/// let existing /* : Option<User> */ = User::get(client, KeyId::pk("user-2")).await?;
+/// let existing /* : Option<User> */ = User::get(KeyId::pk("user-2")).await?;
 ///
-/// # let client = cclient.clone();
-/// // Delete the user, if it exist
+/// // Delete the user, if it exists
 /// if let Some(u) = existing {
-///     u.delete(client).exists().await?;
+///     u.delete().exists().await?;
 /// }
 /// # Ok(())
 /// # }
@@ -278,7 +275,7 @@ impl<TD: TableDefinition> Item<TD> {
     /// The attribute is identified by the type parameter `A`, which must
     /// implement [`AttributeDefinition`]. The return type is a typed reference
     /// whose concrete type is determined by `A::Type` (e.g. `&str` for
-    /// `StringAttribute`, `&str` for `NumberAttribute`).
+    /// `StringAttribute`, the raw numeric `&str` for `NumberAttribute`).
     ///
     /// # Examples
     ///

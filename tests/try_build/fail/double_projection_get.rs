@@ -11,8 +11,8 @@
 use dynamodb_facade::test_fixtures::*;
 use dynamodb_facade::{DynamoDBItemOp, KeyId, Projection};
 
-fn test(client: dynamodb_facade::Client) {
-    let _ = User::get(client, KeyId::pk("u-1"))
+fn test() {
+    let _ = User::get(KeyId::pk("u-1"))
         .project(Projection::<PlatformTable>::new(["name"]))
         .project(Projection::<PlatformTable>::new(["email"])); // <-- compile error here
 }

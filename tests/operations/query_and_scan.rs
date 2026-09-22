@@ -24,9 +24,10 @@
 use std::sync::OnceLock;
 
 use dynamodb_facade::{
-    Condition, DynamoDBItemBatchOp, DynamoDBItemOp, Item, KeyCondition, Result,
-    attribute_definitions, dynamodb_batch_write, dynamodb_item, index_definitions,
-    table_definitions,
+    Condition, DynamoDBItemBatchOp, Item, KeyCondition, Result, attribute_definitions,
+    dynamodb_item,
+    explicit_client::{DynamoDBItemOp, dynamodb_batch_write},
+    index_definitions, table_definitions,
 };
 use serde::{Deserialize, Serialize};
 

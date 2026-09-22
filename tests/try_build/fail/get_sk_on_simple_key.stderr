@@ -1,18 +1,18 @@
 error[E0308]: mismatched types
-  --> tests/try_build/fail/get_sk_on_simple_key.rs:15:51
+  --> tests/try_build/fail/get_sk_on_simple_key.rs:15:43
    |
-15 |     let _ = User::get(client, KeyId::pk("u-1").sk("oops")); // <-- compile error here
-   |                                                -- ^^^^^^ expected `NoId`, found `&str`
-   |                                                |
-   |                                                arguments to this method are incorrect
+15 |     let _ = User::get(KeyId::pk("u-1").sk("oops")); // <-- compile error here
+   |                                        -- ^^^^^^ expected `NoId`, found `&str`
+   |                                        |
+   |                                        arguments to this method are incorrect
    |
 help: the return type of this call is `&'static str` due to the type of the argument passed
-  --> tests/try_build/fail/get_sk_on_simple_key.rs:15:31
+  --> tests/try_build/fail/get_sk_on_simple_key.rs:15:23
    |
-15 |     let _ = User::get(client, KeyId::pk("u-1").sk("oops")); // <-- compile error here
-   |                               ^^^^^^^^^^^^^^^^^^^^------^
-   |                                                   |
-   |                                                   this argument influences the return type of `sk`
+15 |     let _ = User::get(KeyId::pk("u-1").sk("oops")); // <-- compile error here
+   |                       ^^^^^^^^^^^^^^^^^^^^------^
+   |                                           |
+   |                                           this argument influences the return type of `sk`
 note: method defined here
   --> src/item/key_id.rs
    |

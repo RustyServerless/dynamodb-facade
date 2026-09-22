@@ -13,7 +13,7 @@ use super::AttributeValue;
 ///
 /// | Rust type | DynamoDB type |
 /// |---|---|
-/// | [`String`], [`&str`], `&String` | `S` |
+/// | [`String`], [`&str`], `&String`, [`Cow<'_, str>`](std::borrow::Cow), [`Rc<str>`](std::rc::Rc), [`Arc<str>`](std::sync::Arc), [`Box<str>`] | `S` |
 /// | [`bool`] | `BOOL` |
 /// | Integer and float primitives | `N` |
 /// | [`Vec<u8>`], [`&[u8]`] | `B` |
@@ -104,7 +104,7 @@ pub trait IntoAttributeValue {
 ///     }
 /// }
 ///
-/// # async fn example(client: dynamodb_facade::Client) -> dynamodb_facade::Result<()> {
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// let new_config = PlatformConfig {
 ///     max_enrollments: 50,
 ///     maintenance_mode: false,
@@ -113,7 +113,6 @@ pub trait IntoAttributeValue {
 /// // PlatformConfig is a Serialize type — to_attribute_value bridges it
 /// // to an AttributeValue for use in Update::set.
 /// MainPlatformConfig::update_by_id(
-///     client,
 ///     KeyId::NONE,
 ///     Update::set("platform_config", to_attribute_value(&new_config)),
 /// )
@@ -167,7 +166,7 @@ pub fn to_attribute_value<T: serde::Serialize>(value: T) -> AttributeValue {
 ///     }
 /// }
 ///
-/// # async fn example(client: dynamodb_facade::Client) -> dynamodb_facade::Result<()> {
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// let new_config = PlatformConfig {
 ///     max_enrollments: 50,
 ///     maintenance_mode: false,
@@ -176,7 +175,6 @@ pub fn to_attribute_value<T: serde::Serialize>(value: T) -> AttributeValue {
 /// // PlatformConfig is a Serialize type — try_to_attribute_value bridges it
 /// // to an AttributeValue for use in Update::set.
 /// MainPlatformConfig::update_by_id(
-///     client,
 ///     KeyId::NONE,
 ///     Update::set("platform_config", try_to_attribute_value(&new_config)?),
 /// )
@@ -199,6 +197,7 @@ pub fn try_to_attribute_value<T: serde::Serialize>(value: T) -> crate::Result<At
 /// [`IntoAttributeValue`] is implemented for:
 /// - `AsSet<String>` → `SS`
 /// - `AsSet<N>` (any numeric primitive) → `NS`
+/// - `AsSet<Vec<u8>>` → `BS`
 ///
 /// `AsSet<T>` derefs to `&Vec<T>` and implements [`IntoIterator`], so you can
 /// use it anywhere a `Vec<T>` is expected for reading.
@@ -224,9 +223,8 @@ pub fn try_to_attribute_value<T: serde::Serialize>(value: T) -> crate::Result<At
 /// Using `AsSet` with the `add` update expression to atomically add tags:
 ///
 /// ```no_run
-/// // Requires a live DynamoDB connection
-/// use dynamodb_facade::{AsSet, IntoAttributeValue};
-/// // Update::add("tags", AsSet(vec!["rust".to_owned()]).into_attribute_value())
+/// use dynamodb_facade::{Update, AsSet, IntoAttributeValue};
+/// let tag_update = Update::add("tags", AsSet(vec!["rust".to_owned()]).into_attribute_value());
 /// ```
 #[derive(Debug)]
 // New type wrapper for a Vec that will cause it to be serialized as a HashSet

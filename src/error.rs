@@ -166,11 +166,10 @@ impl Error {
     /// # use dynamodb_facade::{DynamoDBItemOp, DynamoDBError, KeyId};
     /// # use dynamodb_facade::test_fixtures::*;
     /// # async fn example(
-    /// #     client: dynamodb_facade::Client,
     /// #     user_id: &str,
     /// #     course_id: &str,
     /// # ) -> Result<Enrollment, String> {
-    /// match Enrollment::delete_by_id(client, KeyId::pk(user_id).sk(course_id))
+    /// match Enrollment::delete_by_id(KeyId::pk(user_id).sk(course_id))
     ///     .exists()
     ///     .await
     /// {

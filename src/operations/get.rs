@@ -8,7 +8,9 @@ use aws_sdk_dynamodb::operation::get_item::builders::GetItemFluentBuilder;
 /// Builder for a DynamoDB `GetItem` request.
 ///
 /// Constructed via [`DynamoDBItemOp::get`] (typed, with a concrete `T`) or
-/// [`GetItemRequest::new`] (stand-alone, raw output). The builder provides:
+/// [`GetItemRequest::new`] / [`GetItemRequest::with_client`] (stand-alone, raw output).
+///
+/// The builder provides:
 ///
 /// - **Output format** — the result can be deserialized into `T`.
 ///   Call [`.raw()`][GetItemRequest::raw] to receive an untyped [`Item<TD>`]
@@ -32,14 +34,12 @@ use aws_sdk_dynamodb::operation::get_item::builders::GetItemFluentBuilder;
 /// # use dynamodb_facade::test_fixtures::*;
 /// use dynamodb_facade::{DynamoDBItemOp, KeyId};
 ///
-/// # async fn example(cclient: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-/// # let client = cclient.clone();
+/// # async fn example() -> dynamodb_facade::Result<()> {
 /// // Simple get
-/// let user /* : Option<User> */ = User::get(client, KeyId::pk("user-1")).await?;
+/// let user /* : Option<User> */ = User::get(KeyId::pk("user-1")).await?;
 ///
-/// # let client = cclient.clone();
 /// // Consistent read
-/// let user /* : Option<User> */ = User::get(client, KeyId::pk("user-1"))
+/// let user /* : Option<User> */ = User::get(KeyId::pk("user-1"))
 ///     .consistent_read()
 ///     .await?;
 /// # Ok(())
@@ -59,7 +59,8 @@ pub struct GetItemRequest<
 // -- Stand-alone constructor (T = (), O = Raw)
 
 impl<TD: TableDefinition> GetItemRequest<TD> {
-    /// Creates a stand-alone `GetItemRequest` with raw output (`T = ()`, `O = Raw`).
+    /// Creates a stand-alone `GetItemRequest` with raw output (`T = ()`, `O = Raw`) using
+    /// the globally defined [`aws_sdk_dynamodb::Client`].
     ///
     /// Use this when you do not have a concrete item type and want to work with
     /// the raw [`Item<TD>`] map directly. For typed access, prefer
@@ -71,13 +72,36 @@ impl<TD: TableDefinition> GetItemRequest<TD> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{GetItemRequest, Key};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # async fn example() -> dynamodb_facade::Result<()> {
     /// # let key: Key<PlatformTable> = sample_user_item().into_key_only();
-    /// let raw_item = GetItemRequest::<PlatformTable>::new(client, key).await?;
+    /// let raw_item = GetItemRequest::<PlatformTable>::new(key).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(client: aws_sdk_dynamodb::Client, key: Key<TD>) -> Self {
+    pub fn new(key: Key<TD>) -> Self {
+        Self::_new(global_client(), key)
+    }
+
+    /// Creates a stand-alone `GetItemRequest` with raw output (`T = ()`, `O = Raw`) using
+    /// the provided [`aws_sdk_dynamodb::Client`].
+    ///
+    /// Use this when you do not have a concrete item type and want to work with
+    /// the raw [`Item<TD>`] map directly. For typed access, prefer
+    /// [`explicit_client::DynamoDBItemOp::get`] instead.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use dynamodb_facade::test_fixtures::*;
+    /// use dynamodb_facade::{GetItemRequest, Key};
+    ///
+    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
+    /// # let key: Key<PlatformTable> = sample_user_item().into_key_only();
+    /// let raw_item = GetItemRequest::<PlatformTable>::with_client(client, key).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_client(client: aws_sdk_dynamodb::Client, key: Key<TD>) -> Self {
         Self::_new(client, key)
     }
 }
@@ -110,8 +134,8 @@ impl<TD: TableDefinition, T, O: OutputFormat, P: ProjectionState> GetItemRequest
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let user /* : Option<User> */ = User::get(client, KeyId::pk("user-1"))
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let user /* : Option<User> */ = User::get(KeyId::pk("user-1"))
     ///     .consistent_read()
     ///     .await?;
     /// # Ok(())
@@ -136,8 +160,8 @@ impl<TD: TableDefinition, T, O: OutputFormat, P: ProjectionState> GetItemRequest
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let sdk_builder = User::get(client, KeyId::pk("user-1")).into_inner();
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let sdk_builder = User::get(KeyId::pk("user-1")).into_inner();
     /// // configure sdk_builder further, then call .send().await
     /// # Ok(())
     /// # }
@@ -165,7 +189,7 @@ impl<TD: TableDefinition, T, O: OutputFormat> GetItemRequest<TD, T, O, NoProject
     /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
     /// // Fetch only the "name" and "email" attributes
     /// let partial /* : Option<Item<PlatformTable>> */ =
-    ///     User::get(client, KeyId::pk("user-1"))
+    ///     User::get(KeyId::pk("user-1"))
     ///         .project(Projection::new(["name", Email::NAME]))
     ///         .await?;
     /// // partial: contains only "PK", "SK", "name" and "email"
@@ -200,8 +224,8 @@ impl<TD: TableDefinition, T, P: ProjectionState> GetItemRequest<TD, T, Typed, P>
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let raw_item = User::get(client, KeyId::pk("user-1"))
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let raw_item = User::get(KeyId::pk("user-1"))
     ///     .raw()
     ///     .await?;
     /// // raw_item: Option<Item<PlatformTable>>
@@ -242,8 +266,8 @@ impl<TD: TableDefinition, T: DynamoDBItem<TD> + DeserializeOwned, P: ProjectionS
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let user /* : Option<User> */ = User::get(client, KeyId::pk("user-1"))
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let user /* : Option<User> */ = User::get(KeyId::pk("user-1"))
     ///     .consistent_read()
     ///     .execute()
     ///     .await?;
@@ -296,8 +320,8 @@ impl<TD: TableDefinition, T, P: ProjectionState> GetItemRequest<TD, T, Raw, P> {
     /// # use dynamodb_facade::test_fixtures::*;
     /// use dynamodb_facade::{DynamoDBItemOp, KeyId};
     ///
-    /// # async fn example(client: aws_sdk_dynamodb::Client) -> dynamodb_facade::Result<()> {
-    /// let raw = User::get(client, KeyId::pk("user-1"))
+    /// # async fn example() -> dynamodb_facade::Result<()> {
+    /// let raw = User::get(KeyId::pk("user-1"))
     ///     .raw()
     ///     .execute()
     ///     .await?;

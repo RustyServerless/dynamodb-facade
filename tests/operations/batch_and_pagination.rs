@@ -22,8 +22,9 @@ use std::pin::pin;
 use std::sync::OnceLock;
 
 use dynamodb_facade::{
-    DynamoDBItemBatchOp, DynamoDBItemOp, Result, attribute_definitions, dynamodb_batch_write,
-    dynamodb_item, table_definitions,
+    DynamoDBItemBatchOp, Result, attribute_definitions, dynamodb_item,
+    explicit_client::{DynamoDBItemOp, dynamodb_batch_write},
+    table_definitions,
 };
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
