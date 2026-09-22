@@ -1,3 +1,6 @@
+#![warn(missing_docs)]
+#![warn(rustdoc::missing_crate_level_docs)]
+#![cfg_attr(docsrs, deny(rustdoc::broken_intra_doc_links))]
 //! A typed facade over [`aws-sdk-dynamodb`][aws_sdk_dynamodb] with composable
 //! expression builders and typestate operation builders.
 //!

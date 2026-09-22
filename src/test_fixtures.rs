@@ -89,7 +89,9 @@ crate::index_definitions! {
 /// Accessed via `PlatformConfig::get(KeyId::NONE)`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlatformConfig {
+    /// How many enrolment per user are allowed
     pub max_enrollments: u32,
+    /// Is the platform in global maintenance state
     pub maintenance_mode: bool,
 }
 
@@ -110,9 +112,13 @@ crate::dynamodb_item! {
 /// Accessed via `User::get(KeyId::pk(user_id))`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
+    ///The user ID
     pub id: String,
+    ///The user name
     pub name: String,
+    ///The user email
     pub email: String,
+    ///The user role on the e-learning platform
     pub role: String,
 }
 
@@ -141,9 +147,13 @@ crate::dynamodb_item! {
 /// Accessed via `Enrollment::get(KeyId::pk(user_id).sk(course_id))`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Enrollment {
+    /// The enrolled user id
     pub user_id: String,
+    /// The course id the user is enrolled in
     pub course_id: String,
+    /// Timestamp of the user enrollment for this course
     pub enrolled_at: u64,
+    /// The user progress in the course, between 0.0 and 100.0
     pub progress: f64,
 }
 

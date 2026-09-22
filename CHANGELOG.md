@@ -22,6 +22,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Breaking**: `dynamodb_batch_write` no longer takes the `client` parameter but instead relies on the `global_client`. Use `dynamodb_facade::explicit_client::dynamodb_batch_write` instead of `dynamodb_facade::dynamodb_batch_write` to keep the old behavior.
 - **Breaking**: Renamed the `QueryRequest` and `ScanRequest` index constructors from `new_index` to `index_new`.
 - **Breaking**: All the operations `*Request` (`GetRequest`, `PutRequest`, `QueryRequest`, ...) builders `new()` constructors are no longer expecting a `client` parameter. The new `with_client` constructor has been added with the old `new` signature.
+- Making clippy more aggressive and adding missing doc
+
+[Unreleased]: https://github.com/RustyServerless/lambda-appsync/compare/v0.1.1...main
 
 ## [0.1.1] - 2026-04-27
 
@@ -38,6 +41,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Crate-level documentation in `lib.rs` listed only four `Error` variants; updated to enumerate all five (`DynamoDB`, `Serde`, `FailedBatchWrite`, `Other`, `Custom`).
 - Corrected an incorrect code snippet in `EXAMPLES.md`.
+
+[0.1.1]: https://github.com/RustyServerless/lambda-appsync/compare/v0.1.0...v0.1.1
 
 ## [0.1.0] - 2026-04-21
 
@@ -63,6 +68,7 @@ First public release on crates.io. `dynamodb-facade` is a typed facade over [`aw
 - **Documentation.** Full API documentation on [docs.rs], a [`README.md`](README.md) with a side-by-side raw-SDK-vs-facade comparison, and [`EXAMPLES.md`](EXAMPLES.md) — a 13-section tour across a single-table domain covering schema design, every CRUD variant, index queries, scans with dispatch, the full condition and update DSL, batch writes, and transactions.
 
 [docs.rs]: https://docs.rs/dynamodb-facade
+[0.1.0]: https://github.com/RustyServerless/lambda-appsync/compare/v0.0.0...v0.1.0
 
 ## [0.0.0] - 2026-02-20
 
@@ -70,6 +76,4 @@ First public release on crates.io. `dynamodb-facade` is a typed facade over [`aw
 
 - Crate.io placeholder
 
-[0.1.1]: https://github.com/RustyServerless/dynamodb-facade/releases/tag/v0.1.1
-[0.1.0]: https://github.com/RustyServerless/dynamodb-facade/releases/tag/v0.1.0
 [0.0.0]: https://github.com/RustyServerless/dynamodb-facade/releases/tag/v0.0.0

@@ -119,6 +119,13 @@ pub use key_id::*;
 pub trait DynamoDBItem<TD: TableDefinition>:
     Sized + HasTableKeyAttributes<TD> + KeyBuilder<TD>
 {
+    /// Attribute definitions that are always computed and included in the item when
+    /// serializing it. Typically used for item type discriminators or DynamoDB
+    /// expiration timestamps.
+    ///
+    /// Note that these are **in addition** to the [`PartitionKey`](KeySchema::PartitionKey)
+    /// and, optionnaly, the [`SortKey`](CompositeKeySchema::SortKey) declared by the
+    /// [`TableDefinition`] of this [`DynamoDBItem`].
     type AdditionalAttributes: AttributeList<TD, Self>;
 
     /// Serializes `self` into an [`Item<TD>`].
