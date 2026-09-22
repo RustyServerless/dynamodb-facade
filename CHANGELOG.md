@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+[Unreleased]: https://github.com/RustyServerless/lambda-appsync/compare/v0.2.0...main
+
+## [0.2.0]
+
 ### Added
 
 - **Breaking**: `IntoAttributeValue` and `IntoStringAttributeValue` implementations for `Rc<str>`, `Arc<str>` and `Box<str>`.
@@ -24,7 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Breaking**: All the operations `*Request` (`GetRequest`, `PutRequest`, `QueryRequest`, ...) builders `new()` constructors are no longer expecting a `client` parameter. The new `with_client` constructor has been added with the old `new` signature.
 - Making clippy more aggressive and adding missing doc
 
-[Unreleased]: https://github.com/RustyServerless/lambda-appsync/compare/v0.1.1...main
+[0.2.0]: https://github.com/RustyServerless/lambda-appsync/compare/v0.1.1...v0.2.0
 
 ## [0.1.1] - 2026-04-27
 

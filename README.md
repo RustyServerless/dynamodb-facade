@@ -119,7 +119,7 @@ Or in `Cargo.toml`:
 
 ```toml
 [dependencies]
-dynamodb-facade = "0.1"
+dynamodb-facade = "0.2"
 ```
 
 ---
